@@ -23,13 +23,11 @@ export class QuickSearchInWorkspace implements QuickOpenModel {
     private currentSearchId: number = -1;
     protected MAX_RESULTS = 100;
 
-    constructor(
-        @inject(QuickOpenService) protected readonly quickOpenService: QuickOpenService,
-        @inject(SearchInWorkspaceService) protected readonly searchInWorkspaceService: SearchInWorkspaceService,
-        @inject(OpenerService) protected readonly openerService: OpenerService,
-        @inject(LabelProvider) protected readonly labelProvider: LabelProvider,
-        @inject(ILogger) protected readonly logger: ILogger,
-    ) { }
+    @inject(QuickOpenService) protected readonly quickOpenService: QuickOpenService;
+    @inject(SearchInWorkspaceService) protected readonly searchInWorkspaceService: SearchInWorkspaceService;
+    @inject(OpenerService) protected readonly openerService: OpenerService;
+    @inject(LabelProvider) protected readonly labelProvider: LabelProvider;
+    @inject(ILogger) protected readonly logger: ILogger;
 
     isEnabled(): boolean {
         return this.searchInWorkspaceService.isEnabled();
