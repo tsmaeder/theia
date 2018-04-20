@@ -6,17 +6,25 @@
  */
 
 import { inject, injectable } from "inversify";
-import { BaseLanguageClientContribution, LanguageClientFactory, LanguageClientOptions } from '@theia/languages/lib/browser';
+import {
+    BaseLanguageClientContribution, LanguageClientFactory,
+    LanguageClientOptions, DidChangeConfigurationParams,
+    ILanguageClient, DidChangeConfigurationNotification
+} from '@theia/languages/lib/browser';
 import { Languages, Workspace } from "@theia/languages/lib/common";
 import { ILogger } from '@theia/core/lib/common/logger';
 import { MessageService } from '@theia/core/lib/common/message-service';
 import { CPP_LANGUAGE_ID, CPP_LANGUAGE_NAME, HEADER_AND_SOURCE_FILE_EXTENSIONS } from '../common';
+import { BuildConfiguration, BuildConfigurationService } from "@theia/languages/lib/browser/build-configurations-service";
 
 @injectable()
 export class CppClientContribution extends BaseLanguageClientContribution {
 
     readonly id = CPP_LANGUAGE_ID;
     readonly name = CPP_LANGUAGE_NAME;
+
+    @inject(BuildConfigurationService)
+    protected readonly buildConfigurationService: BuildConfigurationService;
 
     constructor(
         @inject(Workspace) protected readonly workspace: Workspace,
@@ -26,6 +34,29 @@ export class CppClientContribution extends BaseLanguageClientContribution {
         @inject(ILogger) protected readonly logger: ILogger
     ) {
         super(workspace, languages, languageClientFactory);
+    }
+
+    protected onReady(languageClient: ILanguageClient): void {
+        super.onReady(languageClient);
+
+        // When the language server is ready, send the active build
+        // configuration so it knows where to find the build commands
+        // (e.g. compile_commands.json).
+        this.buildConfigurationService.getActiveConfiguration().then(config => {
+            this.onActiveBuildConfigChanged(config);
+        });
+        this.buildConfigurationService.onActiveBuildConfigChanged(config => this.onActiveBuildConfigChanged(config));
+    }
+
+    async onActiveBuildConfigChanged(config: BuildConfiguration | undefined) {
+        const interfaceParams: DidChangeConfigurationParams = {
+            settings: {
+                compilationDatabasePath: config ? config.directory : undefined,
+            },
+        };
+
+        const languageClient = await this.languageClient;
+        languageClient.sendNotification(DidChangeConfigurationNotification.type, interfaceParams);
     }
 
     protected get documentSelector() {

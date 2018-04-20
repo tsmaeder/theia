@@ -15,6 +15,10 @@ import { LanguageClientContribution } from "./language-client-contribution";
 import { WorkspaceSymbolCommand } from './workspace-symbols';
 import { LanguageClientProvider } from './language-client-provider';
 import { LanguageClientProviderImpl } from './language-client-provider-impl';
+import { BuildConfigurationServiceImpl, BuildConfigurationService } from "./build-configurations-service";
+import { BuildConfigurationsContributions, ChangeBuildConfiguration } from "./build-configurations-contributions";
+import { GetWorkspaceRoot } from "./build-configurations-service";
+import { WorkspaceService } from "@theia/workspace/lib/browser";
 
 export default new ContainerModule(bind => {
     bind(Window).to(WindowImpl).inSingletonScope();
@@ -31,4 +35,13 @@ export default new ContainerModule(bind => {
     bind(LanguageClientProviderImpl).toSelf().inSingletonScope();
     bind(LanguageClientProvider).toDynamicValue(ctx => ctx.container.get(LanguageClientProviderImpl)).inSingletonScope();
 
+    // Build configuration stuff.
+    bind(GetWorkspaceRoot).toDynamicValue(ctx => {
+        const ws: WorkspaceService = ctx.container.get(WorkspaceService);
+        return () => ws.root;
+    });
+    bind(BuildConfigurationService).to(BuildConfigurationServiceImpl).inSingletonScope();
+    bind(ChangeBuildConfiguration).toSelf().inSingletonScope();
+    bind(BuildConfigurationsContributions).toSelf().inSingletonScope();
+    bind(CommandContribution).to(BuildConfigurationsContributions).inSingletonScope();
 });
