@@ -8,12 +8,35 @@
 import { injectable, inject } from "inversify";
 import { MessageClient, MessageType, MessageOptions } from "./message-service-protocol";
 
-@injectable()
-export class MessageService {
+export const MessageService = Symbol('MessageService');
+export interface MessageService {
 
-    constructor(
-        @inject(MessageClient) protected readonly client: MessageClient
-    ) { }
+    log(message: string, ...actions: string[]): Promise<string | undefined>;
+    log(message: string, options?: MessageOptions, ...actions: string[]): Promise<string | undefined>;
+    // tslint:disable-next-line:no-any
+    log(message: string, ...args: any[]): Promise<string | undefined>;
+
+    info(message: string, ...actions: string[]): Promise<string | undefined>;
+    info(message: string, options?: MessageOptions, ...actions: string[]): Promise<string | undefined>;
+    // tslint:disable-next-line:no-any
+    info(message: string, ...args: any[]): Promise<string | undefined>;
+
+    warn(message: string, ...actions: string[]): Promise<string | undefined>;
+    warn(message: string, options?: MessageOptions, ...actions: string[]): Promise<string | undefined>;
+    // tslint:disable-next-line:no-any
+    warn(message: string, ...args: any[]): Promise<string | undefined>;
+
+    error(message: string, ...actions: string[]): Promise<string | undefined>;
+    error(message: string, options?: MessageOptions, ...actions: string[]): Promise<string | undefined>;
+    // tslint:disable-next-line:no-any
+    error(message: string, ...args: any[]): Promise<string | undefined>;
+}
+
+@injectable()
+export class MessageServiceImpl implements MessageService {
+
+    @inject(MessageClient)
+    protected readonly client: MessageClient;
 
     log(message: string, ...actions: string[]): Promise<string | undefined>;
     log(message: string, options?: MessageOptions, ...actions: string[]): Promise<string | undefined>;

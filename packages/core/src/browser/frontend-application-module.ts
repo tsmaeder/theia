@@ -17,7 +17,8 @@ import {
     CommandContribution, CommandRegistry, CommandService,
     MenuModelRegistry, MenuContribution,
     MessageService,
-    MessageClient
+    MessageClient,
+    MessageServiceImpl
 } from "../common";
 import { KeybindingRegistry, KeybindingContext, KeybindingContribution } from "./keybinding";
 import { FrontendApplication, FrontendApplicationContribution, DefaultFrontendApplicationContribution } from './frontend-application';
@@ -94,7 +95,7 @@ export const frontendApplicationModule = new ContainerModule((bind, unbind, isBo
     bindContributionProvider(bind, KeybindingContribution);
 
     bind(MessageClient).toSelf().inSingletonScope();
-    bind(MessageService).toSelf().inSingletonScope();
+    bind(MessageService).to(MessageServiceImpl).inSingletonScope();
 
     bind(CommonFrontendContribution).toSelf().inSingletonScope();
     [CommandContribution, KeybindingContribution, MenuContribution].forEach(serviceIdentifier =>
