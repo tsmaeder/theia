@@ -7,9 +7,9 @@
 
 import { injectable, inject, named } from 'inversify';
 import { ILogger } from '@theia/core/lib/common/';
-import { ProcessType, TaskInfo } from '../common/task-protocol';
 import { TaskManager } from './task-manager';
-import { Process, ProcessManager } from "@theia/process/lib/node";
+import { ProcessType, TaskInfo, Task } from '../common/task-protocol';
+import { Process } from "@theia/process/lib/node";
 
 export const TaskProcessOptions = Symbol("TaskProcessOptions");
 export interface TaskProcessOptions {
@@ -21,17 +21,16 @@ export interface TaskProcessOptions {
 }
 
 export const TaskFactory = Symbol("TaskFactory");
-export type TaskFactory = (options: TaskProcessOptions) => Task;
+export type TaskFactory = (options: TaskProcessOptions) => AbstractTask;
 
 @injectable()
-export class Task {
+export abstract class AbstractTask implements Task {
     protected taskId: number;
 
     constructor(
         @inject(TaskManager) protected readonly taskManager: TaskManager,
         @inject(ILogger) @named('task') protected readonly logger: ILogger,
-        @inject(TaskProcessOptions) protected readonly options: TaskProcessOptions,
-        @inject(ProcessManager) protected readonly processManager: ProcessManager
+        @inject(TaskProcessOptions) protected readonly options: TaskProcessOptions
     ) {
         this.taskId = this.taskManager.register(this, this.options.context);
 
@@ -44,32 +43,10 @@ export class Task {
     }
 
     /** terminates the task */
-    kill(): Promise<void> {
-        return new Promise<void>(resolve => {
-            if (this.process.killed) {
-                resolve();
-            } else {
-                const toDispose = this.process.onExit(event => {
-                    toDispose.dispose();
-                    resolve();
-                });
-                this.process.kill();
-            }
-        });
-    }
+    abstract kill(): Promise<void>;
 
     /** Returns runtime information about task */
-    getRuntimeInfo(): TaskInfo {
-        return {
-            taskId: this.id,
-            osProcessId: this.process.pid,
-            terminalId: (this.processType === 'terminal') ? this.process.id : undefined,
-            processId: (this.processType === 'raw') ? this.process.id : undefined,
-            command: this.command,
-            label: this.label,
-            ctx: this.context
-        };
-    }
+    abstract getRuntimeInfo(): TaskInfo;
 
     get command() {
         return this.options.command;

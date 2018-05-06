@@ -5,12 +5,14 @@
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
  */
 
-import { inject, injectable, named } from "inversify";
-import { ILogger } from '@theia/core/lib/common';
+import { inject, injectable, named } from 'inversify';
+import { ILogger, ContributionProvider } from '@theia/core/lib/common';
 import { QuickOpenTask } from './quick-open-task';
 import { MAIN_MENU_BAR, CommandContribution, Command, CommandRegistry, MenuContribution, MenuModelRegistry } from '@theia/core/lib/common';
-import { FrontendApplication } from '@theia/core/lib/browser';
+import { FrontendApplication, FrontendApplicationContribution } from '@theia/core/lib/browser';
 import { WidgetManager } from '@theia/core/lib/browser/widget-manager';
+import { TaskContribution, TaskResolverRegistry } from '../common/task-protocol';
+import { RawOrTerminalTaskResolver } from './raw-or-terminal-task-resolver';
 
 export namespace TaskCommands {
     // Task menu
@@ -35,14 +37,39 @@ export namespace TaskCommands {
 }
 
 @injectable()
-export class TaskFrontendContribution implements CommandContribution, MenuContribution {
+export class TaskFrontendContribution implements CommandContribution, MenuContribution, FrontendApplicationContribution, TaskContribution {
 
-    constructor(
-        @inject(QuickOpenTask) protected readonly quickOpenTask: QuickOpenTask,
-        @inject(FrontendApplication) protected readonly app: FrontendApplication,
-        @inject(ILogger) @named('task') protected readonly logger: ILogger,
-        @inject(WidgetManager) protected readonly widgetManager: WidgetManager
-    ) { }
+    @inject(QuickOpenTask)
+    protected readonly quickOpenTask: QuickOpenTask;
+
+    @inject(FrontendApplication)
+    protected readonly app: FrontendApplication;
+
+    @inject(ILogger) @named('task')
+    protected readonly logger: ILogger;
+
+    @inject(WidgetManager)
+    protected readonly widgetManager: WidgetManager;
+
+    @inject(ContributionProvider) @named(TaskContribution)
+    protected readonly contributionProvider: ContributionProvider<TaskContribution>;
+
+    @inject(TaskResolverRegistry)
+    protected readonly taskResolverRegistry: TaskResolverRegistry;
+
+    @inject(RawOrTerminalTaskResolver)
+    protected readonly rawOrTerminalTaskResolver: RawOrTerminalTaskResolver;
+
+    onStart(): void {
+        this.contributionProvider.getContributions().forEach(contrib =>
+            contrib.registerResolvers(this.taskResolverRegistry)
+        );
+    }
+
+    registerResolvers(resolvers: TaskResolverRegistry): void {
+        resolvers.register('raw', this.rawOrTerminalTaskResolver);
+        resolvers.register('terminal', this.rawOrTerminalTaskResolver);
+    }
 
     registerCommands(registry: CommandRegistry): void {
         registry.registerCommand(

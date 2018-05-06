@@ -6,9 +6,9 @@
  */
 import { inject, injectable, named } from 'inversify';
 import { ILogger } from '@theia/core/lib/common/';
-import { Task } from './task';
 import { Emitter, Event } from '@theia/core/lib/common';
 import { BackendApplicationContribution } from '@theia/core/lib/node';
+import { Task } from '../common/task-protocol';
 
 // inspired by process-manager.ts
 

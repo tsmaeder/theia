@@ -7,20 +7,24 @@
 
 import { ContainerModule, Container } from 'inversify';
 import { ConnectionHandler, JsonRpcConnectionHandler } from "@theia/core/lib/common/messaging";
-import { Task, TaskFactory, TaskProcessOptions } from './task';
-import { TaskClient, TaskServer, taskPath } from '../common/task-protocol';
+import { ProcessTask, TaskFactory, TaskProcessOptions } from './process/process-task';
+import { TaskClient, TaskServer, taskPath, TaskRunnerRegistry, TaskRunner, TaskRunnerContribution } from '../common/task-protocol';
 import { TaskServerImpl } from './task-server';
 import { TaskManager } from './task-manager';
 import { TaskWatcher } from '../common/task-watcher';
 import { BackendApplicationContribution } from '@theia/core/lib/node';
 import { createCommonBindings } from '../common/task-common-module';
+import { TaskRunnerRegistryImpl } from './task-runner-registry';
+import { RawOrTerminalTaskRunner } from './process/raw-or-terminal-task-runner';
+import { bindContributionProvider } from '@theia/core';
+import { TaskBackendContribution } from './task-backend-contribution';
 
 export default new ContainerModule(bind => {
 
     bind(TaskManager).toSelf().inSingletonScope();
     bind(BackendApplicationContribution).toDynamicValue(ctx => ctx.container.get(TaskManager)).inSingletonScope();
     bind(TaskServer).to(TaskServerImpl).inSingletonScope();
-    bind(Task).toSelf().inTransientScope();
+    bind(ProcessTask).toSelf().inTransientScope();
     bind(TaskWatcher).toSelf().inSingletonScope();
 
     bind(ConnectionHandler).toDynamicValue(ctx =>
@@ -40,9 +44,22 @@ export default new ContainerModule(bind => {
             const child = new Container({ defaultScope: 'Singleton' });
             child.parent = ctx.container;
             child.bind(TaskProcessOptions).toConstantValue(options);
-            return child.get(Task);
+            return child.get(ProcessTask);
         }
     );
 
     createCommonBindings(bind);
+
+    bind(TaskBackendContribution).toSelf().inSingletonScope();
+    for (const identifier of [BackendApplicationContribution, TaskRunnerContribution]) {
+        bind(identifier).toService(TaskBackendContribution);
+    }
+
+    // task runner
+    bind(TaskRunnerRegistry).to(TaskRunnerRegistryImpl).inSingletonScope();
+    bindContributionProvider(bind, TaskRunnerContribution);
+
+    // raw/process task
+    bind(RawOrTerminalTaskRunner).toSelf().inSingletonScope();
+    bind(TaskRunner).to(RawOrTerminalTaskRunner).inSingletonScope();
 });

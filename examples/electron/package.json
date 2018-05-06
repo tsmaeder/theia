@@ -7,6 +7,7 @@
   },
   "dependencies": {
     "@theia/callhierarchy": "^0.3.10",
+    "@theia/che": "^0.3.10",
     "@theia/core": "^0.3.10",
     "@theia/cpp": "^0.3.10",
     "@theia/editor": "^0.3.10",
@@ -25,6 +26,7 @@
     "@theia/mini-browser": "^0.3.10",
     "@theia/monaco": "^0.3.10",
     "@theia/navigator": "^0.3.10",
+    "@theia/npm": "^0.3.10",
     "@theia/outline-view": "^0.3.10",
     "@theia/output": "^0.3.10",
     "@theia/preferences": "^0.3.10",

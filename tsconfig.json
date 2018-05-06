@@ -90,6 +90,12 @@
       ],
       "@theia/editorconfig/lib/*": [
         "packages/editorconfig/src/*"
+      ],
+      "@theia/npm/lib/*": [
+        "packages/npm/src/*"
+      ],
+      "@theia/che/lib/*": [
+        "packages/che/src/*"
       ]
     },
     "plugins": [

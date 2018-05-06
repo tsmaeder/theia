@@ -6,21 +6,27 @@
  */
 
 import { ContainerModule } from 'inversify';
-import { CommandContribution, MenuContribution } from '@theia/core/lib/common';
+import { CommandContribution, MenuContribution, bindContributionProvider } from '@theia/core/lib/common';
 import { TaskFrontendContribution } from './task-frontend-contribution';
 import { WebSocketConnectionProvider } from '@theia/core/lib/browser/messaging';
-import { TaskServer, taskPath } from '../common/task-protocol';
+import { TaskServer, taskPath, TaskResolverRegistry, TaskContribution, TaskResolver } from '../common/task-protocol';
 import { TaskWatcher } from '../common/task-watcher';
 import { TaskService } from './task-service';
 import { QuickOpenTask } from './quick-open-task';
 import { TaskConfigurations } from './task-configurations';
 import { createCommonBindings } from '../common/task-common-module';
+import { TaskResolverRegistryImpl } from './process-resolver-registry';
+import { FrontendApplicationContribution } from '@theia/core/lib/browser';
+import { RawOrTerminalTaskResolver } from './raw-or-terminal-task-resolver';
 
 export default new ContainerModule(bind => {
     bind(TaskFrontendContribution).toSelf().inSingletonScope();
     bind(TaskService).toSelf().inSingletonScope();
-    bind(CommandContribution).to(TaskFrontendContribution).inSingletonScope();
-    bind(MenuContribution).to(TaskFrontendContribution).inSingletonScope();
+
+    for (const identifier of [FrontendApplicationContribution, CommandContribution, MenuContribution, TaskContribution]) {
+        bind(identifier).toService(TaskFrontendContribution);
+    }
+
     bind(TaskWatcher).toSelf().inSingletonScope();
     bind(QuickOpenTask).toSelf().inSingletonScope();
     bind(TaskConfigurations).toSelf().inSingletonScope();
@@ -32,4 +38,11 @@ export default new ContainerModule(bind => {
     }).inSingletonScope();
 
     createCommonBindings(bind);
+
+    bind(TaskResolverRegistry).to(TaskResolverRegistryImpl).inSingletonScope();
+    bindContributionProvider(bind, TaskContribution);
+
+    // process task
+    bind(RawOrTerminalTaskResolver).toSelf().inSingletonScope();
+    bind(TaskResolver).to(RawOrTerminalTaskResolver).inSingletonScope();
 });
