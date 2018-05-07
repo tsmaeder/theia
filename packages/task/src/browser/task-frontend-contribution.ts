@@ -11,7 +11,7 @@ import { QuickOpenTask } from './quick-open-task';
 import { MAIN_MENU_BAR, CommandContribution, Command, CommandRegistry, MenuContribution, MenuModelRegistry } from '@theia/core/lib/common';
 import { FrontendApplication, FrontendApplicationContribution } from '@theia/core/lib/browser';
 import { WidgetManager } from '@theia/core/lib/browser/widget-manager';
-import { TaskContribution, TaskResolverRegistry } from '../common/task-protocol';
+import { TaskContribution, TaskResolverRegistry, TaskProviderRegistry } from '../common/task-protocol';
 import { RawOrTerminalTaskResolver } from './raw-or-terminal-task-resolver';
 
 export namespace TaskCommands {
@@ -38,7 +38,6 @@ export namespace TaskCommands {
 
 @injectable()
 export class TaskFrontendContribution implements CommandContribution, MenuContribution, FrontendApplicationContribution, TaskContribution {
-
     @inject(QuickOpenTask)
     protected readonly quickOpenTask: QuickOpenTask;
 
@@ -54,6 +53,9 @@ export class TaskFrontendContribution implements CommandContribution, MenuContri
     @inject(ContributionProvider) @named(TaskContribution)
     protected readonly contributionProvider: ContributionProvider<TaskContribution>;
 
+    @inject(TaskProviderRegistry)
+    protected readonly taskProviderRegistry: TaskProviderRegistry;
+
     @inject(TaskResolverRegistry)
     protected readonly taskResolverRegistry: TaskResolverRegistry;
 
@@ -61,14 +63,10 @@ export class TaskFrontendContribution implements CommandContribution, MenuContri
     protected readonly rawOrTerminalTaskResolver: RawOrTerminalTaskResolver;
 
     onStart(): void {
-        this.contributionProvider.getContributions().forEach(contrib =>
-            contrib.registerResolvers(this.taskResolverRegistry)
-        );
-    }
-
-    registerResolvers(resolvers: TaskResolverRegistry): void {
-        resolvers.register('raw', this.rawOrTerminalTaskResolver);
-        resolvers.register('terminal', this.rawOrTerminalTaskResolver);
+        this.contributionProvider.getContributions().forEach(contrib => {
+            contrib.registerResolvers(this.taskResolverRegistry);
+            contrib.registerProviders(this.taskProviderRegistry);
+        });
     }
 
     registerCommands(registry: CommandRegistry): void {
@@ -104,4 +102,11 @@ export class TaskFrontendContribution implements CommandContribution, MenuContri
         });
     }
 
+    // process-task-type
+    registerResolvers(resolvers: TaskResolverRegistry): void {
+        resolvers.register('raw', this.rawOrTerminalTaskResolver);
+        resolvers.register('terminal', this.rawOrTerminalTaskResolver);
+    }
+    registerProviders(providers: TaskProviderRegistry): void {
+    }
 }

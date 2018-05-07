@@ -6,14 +6,9 @@
  */
 
 import { injectable, inject } from 'inversify';
-import { TaskConfiguration, TaskResolver } from '@theia/task/lib/common';
+import { TaskResolver } from '@theia/task/lib/common';
 import { VariableResolverService } from '@theia/variable-resolver/lib/browser';
-
-export interface NpmTaskConfiguration extends TaskConfiguration {
-    type: 'npm';
-    script: string;
-    cwd?: string;
-}
+import { NpmTaskConfiguration } from '../common/task-protocol';
 
 @injectable()
 export class NpmTaskResolver implements TaskResolver {

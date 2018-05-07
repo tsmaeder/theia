@@ -7,7 +7,7 @@
 
 import { inject, injectable } from "inversify";
 import { TaskService } from './task-service';
-import { TaskInfo } from '../common/task-protocol';
+import { TaskInfo, TaskConfiguration } from '../common/task-protocol';
 import { QuickOpenService, QuickOpenModel, QuickOpenItem, QuickOpenMode } from '@theia/core/lib/browser/quick-open/';
 
 @injectable()
@@ -20,10 +20,10 @@ export class QuickOpenTask implements QuickOpenModel {
         @inject(QuickOpenService) protected readonly quickOpenService: QuickOpenService
     ) { }
 
-    open(): void {
+    async open(): Promise<void> {
         this.items = [];
 
-        const tasks: string[] = this.taskService.getTasks();
+        const tasks = await this.taskService.getTasks();
         for (const task of tasks) {
             this.items.push(new TaskRunQuickOpenItem(task, this.taskService));
         }
@@ -75,21 +75,25 @@ export class QuickOpenTask implements QuickOpenModel {
 export class TaskRunQuickOpenItem extends QuickOpenItem {
 
     constructor(
-        protected readonly taskLabel: string,
+        protected readonly task: TaskConfiguration,
         protected taskService: TaskService
     ) {
         super();
     }
 
     getLabel(): string {
-        return this.taskLabel!;
+        return this.task.label;
+    }
+
+    getDescription(): string {
+        return this.task.type;
     }
 
     run(mode: QuickOpenMode): boolean {
         if (mode !== QuickOpenMode.OPEN) {
             return false;
         }
-        this.taskService.run(this.taskLabel);
+        this.taskService.run(this.task.label);
 
         return true;
     }

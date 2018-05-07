@@ -6,17 +6,18 @@
  */
 
 import { ContainerModule } from 'inversify';
+import { FrontendApplicationContribution } from '@theia/core/lib/browser';
 import { CommandContribution, MenuContribution, bindContributionProvider } from '@theia/core/lib/common';
-import { TaskFrontendContribution } from './task-frontend-contribution';
 import { WebSocketConnectionProvider } from '@theia/core/lib/browser/messaging';
-import { TaskServer, taskPath, TaskResolverRegistry, TaskContribution, TaskResolver } from '../common/task-protocol';
-import { TaskWatcher } from '../common/task-watcher';
-import { TaskService } from './task-service';
 import { QuickOpenTask } from './quick-open-task';
 import { TaskConfigurations } from './task-configurations';
+import { TaskFrontendContribution } from './task-frontend-contribution';
+import { TaskProviderRegistryImpl } from './task-provider-registry-impl';
+import { TaskResolverRegistryImpl } from './task-resolver-registry-impl';
+import { TaskService } from './task-service';
 import { createCommonBindings } from '../common/task-common-module';
-import { TaskResolverRegistryImpl } from './process-resolver-registry';
-import { FrontendApplicationContribution } from '@theia/core/lib/browser';
+import { TaskServer, taskPath, TaskResolverRegistry, TaskContribution, TaskResolver, TaskProviderRegistry } from '../common/task-protocol';
+import { TaskWatcher } from '../common/task-watcher';
 import { RawOrTerminalTaskResolver } from './raw-or-terminal-task-resolver';
 
 export default new ContainerModule(bind => {
@@ -39,6 +40,7 @@ export default new ContainerModule(bind => {
 
     createCommonBindings(bind);
 
+    bind(TaskProviderRegistry).to(TaskProviderRegistryImpl).inSingletonScope();
     bind(TaskResolverRegistry).to(TaskResolverRegistryImpl).inSingletonScope();
     bindContributionProvider(bind, TaskContribution);
 

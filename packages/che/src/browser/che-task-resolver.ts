@@ -6,14 +6,9 @@
  */
 
 import { injectable, inject } from 'inversify';
-import { TaskConfiguration, TaskResolver } from '@theia/task/lib/common';
+import { TaskResolver } from '@theia/task/lib/common';
 import { VariableResolverService } from '@theia/variable-resolver/lib/browser';
-
-export interface CheTaskConfiguration extends TaskConfiguration {
-    type: 'che';
-    target: string;
-    command: string;
-}
+import { CheTaskConfiguration } from '../common/task-protocol';
 
 @injectable()
 export class CheTaskResolver implements TaskResolver {

@@ -8,7 +8,7 @@
 import { inject, injectable, named, postConstruct } from "inversify";
 import { ILogger } from '@theia/core/lib/common';
 import { FrontendApplication, ApplicationShell } from '@theia/core/lib/browser';
-import { TaskServer, TaskExitedEvent, TaskInfo, TaskResolverRegistry } from '../common/task-protocol';
+import { TaskServer, TaskExitedEvent, TaskInfo, TaskResolverRegistry, TaskProviderRegistry, TaskConfiguration } from '../common/task-protocol';
 import { TERMINAL_WIDGET_FACTORY_ID, TerminalWidgetFactoryOptions } from '@theia/terminal/lib/browser/terminal-widget';
 import { WidgetManager } from '@theia/core/lib/browser/widget-manager';
 import { TaskWatcher } from '../common/task-watcher';
@@ -61,6 +61,9 @@ export class TaskService implements TaskConfigurationClient {
     @inject(TaskResolverRegistry)
     protected readonly resolverRegistry: TaskResolverRegistry;
 
+    @inject(TaskProviderRegistry)
+    protected readonly providerRegistry: TaskProviderRegistry;
+
     @postConstruct()
     protected init(): void {
         // wait for the workspace root to be set
@@ -111,9 +114,19 @@ export class TaskService implements TaskConfigurationClient {
         });
     }
 
-    /** returns an array of known task configuration labels */
-    getTasks(): string[] {
-        return this.taskConfigurations.getTaskLabels();
+    /** returns an array of known task configurations */
+    async getTasks(): Promise<TaskConfiguration[]> {
+        const configuredTasks = this.taskConfigurations.getTasks();
+        const detectedTasks: TaskConfiguration[] = [];
+
+        const providers = this.providerRegistry.getProviders();
+        for (let i = 0; i < providers.length; i++) {
+            const provider = providers[i];
+            const tasks = await provider.provideTasks();
+            detectedTasks.push(...tasks);
+        }
+
+        return [...configuredTasks, ...detectedTasks];
     }
 
     /** Returns an array of running tasks 'TaskInfo' objects */

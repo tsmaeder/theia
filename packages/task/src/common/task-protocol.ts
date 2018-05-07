@@ -89,19 +89,32 @@ export interface TaskServer extends JsonRpcServer<TaskClient> {
 
 export const TaskContribution = Symbol('TaskContribution');
 /**
- * The Task Contribution should be implemented to register custom Resolvers.
+ * The Task Contribution should be implemented to register custom Resolvers, Providers.
  */
 export interface TaskContribution {
     registerResolvers(resolvers: TaskResolverRegistry): void;
+    registerProviders(providers: TaskProviderRegistry): void;
 }
+
 export const TaskResolver = Symbol('TaskResolver');
 export interface TaskResolver {
     resolveTask(task: TaskConfiguration): Promise<TaskConfiguration>;
 }
 export const TaskResolverRegistry = Symbol('TaskResolverRegistry');
 export interface TaskResolverRegistry {
-    register(type: string, runner: TaskResolver): Disposable;
+    register(type: string, resolver: TaskResolver): Disposable;
     getResolver(type: string): TaskResolver | undefined;
+}
+
+export const TaskProvider = Symbol('TaskProvider');
+export interface TaskProvider {
+    provideTasks(): Promise<TaskConfiguration[]>;
+}
+export const TaskProviderRegistry = Symbol('TaskProviderRegistry');
+export interface TaskProviderRegistry {
+    register(type: string, provider: TaskProvider): Disposable;
+    getProvider(type: string): TaskProvider | undefined;
+    getProviders(): TaskProvider[];
 }
 
 export const TaskRunnerContribution = Symbol('TaskRunnerContribution');

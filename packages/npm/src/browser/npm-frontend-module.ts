@@ -6,12 +6,13 @@
  */
 
 import { ContainerModule } from 'inversify';
-import { TaskResolver, TaskContribution } from '@theia/task/lib/common';
-import { NpmTaskResolver } from './npm-task-resolver';
+import { TaskContribution } from '@theia/task/lib/common';
 import { NpmTaskContribution } from './npm-task-contribution';
+import { NpmTaskProvider } from './npm-task-provider';
+import { NpmTaskResolver } from './npm-task-resolver';
 
 export default new ContainerModule(bind => {
+    bind(NpmTaskProvider).toSelf().inSingletonScope();
     bind(NpmTaskResolver).toSelf().inSingletonScope();
-    bind(TaskResolver).to(NpmTaskResolver).inSingletonScope();
     bind(TaskContribution).to(NpmTaskContribution).inSingletonScope();
 });

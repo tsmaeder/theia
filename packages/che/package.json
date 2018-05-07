@@ -13,7 +13,7 @@
   "theiaExtensions": [
     {
       "frontend": "lib/browser/che-frontend-module",
-      "backend": "lib/browser/che-backend-module"
+      "backend": "lib/node/che-backend-module"
     }
   ],
   "keywords": [

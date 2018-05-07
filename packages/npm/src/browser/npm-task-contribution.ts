@@ -6,7 +6,8 @@
  */
 
 import { inject, injectable } from 'inversify';
-import { TaskContribution, TaskResolverRegistry } from '@theia/task/lib/common';
+import { TaskContribution, TaskResolverRegistry, TaskProviderRegistry } from '@theia/task/lib/common';
+import { NpmTaskProvider } from './npm-task-provider';
 import { NpmTaskResolver } from './npm-task-resolver';
 
 @injectable()
@@ -15,7 +16,14 @@ export class NpmTaskContribution implements TaskContribution {
     @inject(NpmTaskResolver)
     protected readonly taskResolver: NpmTaskResolver;
 
+    @inject(NpmTaskProvider)
+    protected readonly taskProvider: NpmTaskProvider;
+
     registerResolvers(resolvers: TaskResolverRegistry): void {
         resolvers.register('npm', this.taskResolver);
+    }
+
+    registerProviders(providers: TaskProviderRegistry): void {
+        providers.register('npm', this.taskProvider);
     }
 }

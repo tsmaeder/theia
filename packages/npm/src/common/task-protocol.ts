@@ -7,13 +7,8 @@
 
 import { TaskConfiguration } from '@theia/task/lib/common';
 
-export interface CheTaskConfiguration extends TaskConfiguration {
-    type: 'che';
-    target: Target;
-    command: string;
-}
-
-export interface Target {
-    workspaceId: string,
-    machineName: string
+export interface NpmTaskConfiguration extends TaskConfiguration {
+    type: 'npm';
+    script: string;
+    cwd?: string;
 }

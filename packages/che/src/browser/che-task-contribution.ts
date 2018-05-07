@@ -6,7 +6,8 @@
  */
 
 import { inject, injectable } from 'inversify';
-import { TaskContribution, TaskResolverRegistry } from '@theia/task/lib/common';
+import { TaskContribution, TaskResolverRegistry, TaskProviderRegistry } from '@theia/task/lib/common';
+import { CheTaskProvider } from './che-task-provider';
 import { CheTaskResolver } from './che-task-resolver';
 
 @injectable()
@@ -15,7 +16,14 @@ export class CheTaskContribution implements TaskContribution {
     @inject(CheTaskResolver)
     protected readonly taskResolver: CheTaskResolver;
 
+    @inject(CheTaskProvider)
+    protected readonly taskProvider: CheTaskProvider;
+
     registerResolvers(resolvers: TaskResolverRegistry): void {
         resolvers.register('che', this.taskResolver);
+    }
+
+    registerProviders(providers: TaskProviderRegistry): void {
+        providers.register('che', this.taskProvider);
     }
 }

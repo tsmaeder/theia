@@ -6,12 +6,13 @@
  */
 
 import { ContainerModule } from 'inversify';
-import { TaskResolver, TaskContribution } from '@theia/task/lib/common';
-import { CheTaskResolver } from './che-task-resolver';
+import { TaskContribution } from '@theia/task/lib/common';
 import { CheTaskContribution } from './che-task-contribution';
+import { CheTaskProvider } from './che-task-provider';
+import { CheTaskResolver } from './che-task-resolver';
 
 export default new ContainerModule(bind => {
+    bind(CheTaskProvider).toSelf().inSingletonScope();
     bind(CheTaskResolver).toSelf().inSingletonScope();
-    bind(TaskResolver).to(CheTaskResolver).inSingletonScope();
     bind(TaskContribution).to(CheTaskContribution).inSingletonScope();
 });

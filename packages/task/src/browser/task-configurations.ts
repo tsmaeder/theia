@@ -103,6 +103,11 @@ export class TaskConfigurations implements Disposable {
         return [...this.tasksMap.keys()];
     }
 
+    /** returns the list of known tasks */
+    getTasks(): TaskConfiguration[] {
+        return [...this.tasksMap.values()];
+    }
+
     /** returns the task configuration for a given label */
     getTask(taskLabel: string): TaskConfiguration | undefined {
         return this.tasksMap.get(taskLabel);
