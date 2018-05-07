@@ -10,8 +10,7 @@ import { QuickOpenService, QuickOpenModel, QuickOpenItem, QuickOpenItemOptions }
 import { injectable, inject } from 'inversify';
 import { MenuModelRegistry, MenuContribution, CommandContribution, CommandRegistry, ILogger } from '@theia/core';
 import {
-    CommonMenus, QuickOpenMode, OpenerService, open, Highlight, QuickOpenOptions,
-    KeybindingContribution, KeybindingRegistry
+    CommonMenus, QuickOpenMode, OpenerService, open, Highlight, QuickOpenOptions
 } from '@theia/core/lib/browser';
 import { SearchInWorkspaceService } from './search-in-workspace-service';
 import { SearchInWorkspaceResult, SearchInWorkspaceOptions } from '../common/search-in-workspace-interface';
@@ -172,7 +171,7 @@ const OpenQuickSearchInWorkspaceCommand = {
 };
 
 @injectable()
-export class SearchInWorkspaceContributions implements CommandContribution, MenuContribution, KeybindingContribution {
+export class SearchInWorkspaceContributions implements CommandContribution, MenuContribution {
     constructor(
         @inject(QuickSearchInWorkspace) protected readonly quickSeachInWorkspace: QuickSearchInWorkspace,
     ) { }
@@ -188,13 +187,6 @@ export class SearchInWorkspaceContributions implements CommandContribution, Menu
         menus.registerMenuAction(CommonMenus.EDIT_FIND, {
             commandId: OpenQuickSearchInWorkspaceCommand.id,
             label: OpenQuickSearchInWorkspaceCommand.label,
-        });
-    }
-
-    registerKeybindings(keybindings: KeybindingRegistry): void {
-        keybindings.registerKeybinding({
-            command: OpenQuickSearchInWorkspaceCommand.id,
-            keybinding: 'ctrlcmd+shift+f',
         });
     }
 }

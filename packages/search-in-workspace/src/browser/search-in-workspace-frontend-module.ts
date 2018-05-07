@@ -35,7 +35,6 @@ export default new ContainerModule(bind => {
 
     bind(CommandContribution).to(SearchInWorkspaceContributions).inSingletonScope();
     bind(MenuContribution).to(SearchInWorkspaceContributions).inSingletonScope();
-    bind(KeybindingContribution).to(SearchInWorkspaceContributions).inSingletonScope();
 
     // The object that gets notified of search results.
     bind(SearchInWorkspaceClientImpl).toSelf().inSingletonScope();

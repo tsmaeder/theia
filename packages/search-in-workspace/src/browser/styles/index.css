@@ -32,7 +32,6 @@
     border-width: 1px;
     border-style: solid;
     border-color: var(--theia-border-color1);
-    background: var(--theia-layout-color0);
     color: var(--theia-ui-font-color1);
 }
 
@@ -46,7 +45,7 @@
 }
 
 .t-siw-search-container .searchHeader .controls.button-container {
-    height:30px;
+    height: 22px;
     margin-bottom: 5px;
 }
 
@@ -68,8 +67,8 @@
 }
 
 .t-siw-search-container .searchHeader .search-field .option {
-    cursor: pointer;
     opacity: 0.7;
+    cursor: pointer;
 }
 
 .t-siw-search-container .searchHeader .search-field .option.enabled {
@@ -93,10 +92,10 @@
 }    
 
 .t-siw-search-container .searchHeader .search-field .option-buttons {
-    background: var(--theia-layout-color0);
     height: 23px;
     display: flex;
     align-items:  center;
+    background-color: var(--theia-layout-color2);
 }
 
 .t-siw-search-container .searchHeader .search-field:focus {
@@ -121,19 +120,29 @@
     box-sizing: border-box;
     align-items: center;
     user-select: none;
-    background-size: 100%;
     background-repeat: no-repeat;
     background-position: center;
     border: var(--theia-border-width) solid transparent;
 }
 
+.t-siw-search-container .searchHeader .search-field .fa.option {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .t-siw-search-container .searchHeader .controls .btn{
-    margin-left: 10px;
-    opacity: 0.3;
+    margin-left: 3px;
+    opacity: 0.25;
+    width: 18px
 }
 
 .t-siw-search-container .searchHeader .controls .btn.enabled{
-    margin-left: 10px;
+    opacity: 0.7;
+    cursor: pointer;
+}
+
+.t-siw-search-container .searchHeader .controls .btn.enabled:hover{
     opacity: 1;
 }
 
@@ -291,7 +300,7 @@
 }
 
 .replace-toggle:hover {
-    background: var(--theia-layout-color0);
+    background: var(--theia-layout-color2);
 }
 
 .search-and-replace-fields {

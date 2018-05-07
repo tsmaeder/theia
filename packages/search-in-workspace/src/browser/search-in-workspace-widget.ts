@@ -5,7 +5,7 @@
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
  */
 
-import { Widget, Message, BaseWidget, VirtualRenderer, Key } from "@theia/core/lib/browser";
+import { Widget, Message, BaseWidget, VirtualRenderer, Key, StatefulWidget } from "@theia/core/lib/browser";
 import { inject, injectable, postConstruct } from "inversify";
 import { SearchInWorkspaceResultTreeWidget } from "./search-in-workspace-result-tree-widget";
 import { h } from "@phosphor/virtualdom";
@@ -18,13 +18,15 @@ export interface SearchFieldState {
 }
 
 @injectable()
-export class SearchInWorkspaceWidget extends BaseWidget {
+export class SearchInWorkspaceWidget extends BaseWidget implements StatefulWidget {
+
     static ID = "search-in-workspace";
     static LABEL = "Search";
 
     protected matchCaseState: SearchFieldState;
     protected wholeWordState: SearchFieldState;
     protected regExpState: SearchFieldState;
+    protected includeIgnoredState: SearchFieldState;
 
     protected showSearchDetails = false;
     protected hasResults = false;
@@ -69,10 +71,16 @@ export class SearchInWorkspaceWidget extends BaseWidget {
             enabled: false,
             title: "Use Regular Expression"
         };
+        this.includeIgnoredState = {
+            className: "include-ignored fa fa-eye",
+            enabled: false,
+            title: "Include Ignored Files"
+        };
         this.searchInWorkspaceOptions = {
             matchCase: false,
             matchWholeWord: false,
             useRegExp: false,
+            includeIgnored: false,
             include: "",
             exclude: "",
             maxResults: 500
@@ -81,6 +89,34 @@ export class SearchInWorkspaceWidget extends BaseWidget {
             this.hasResults = r.size > 0;
             this.update();
         });
+    }
+
+    storeState(): object {
+        return {
+            matchCaseState: this.matchCaseState,
+            wholeWordState: this.wholeWordState,
+            regExpState: this.regExpState,
+            includeIgnoredState: this.includeIgnoredState,
+            showSearchDetails: this.showSearchDetails,
+            searchInWorkspaceOptions: this.searchInWorkspaceOptions,
+            searchTerm: this.searchTerm,
+            replaceTerm: this.replaceTerm,
+            showReplaceField: this.showReplaceField
+        };
+    }
+
+    // tslint:disable-next-line:no-any
+    restoreState(oldState: any): void {
+        this.matchCaseState = oldState.matchCaseState;
+        this.wholeWordState = oldState.wholeWordState;
+        this.regExpState = oldState.regExpState;
+        this.includeIgnoredState = oldState.includeIgnoredState;
+        this.showSearchDetails = oldState.showSearchDetails;
+        this.searchInWorkspaceOptions = oldState.searchInWorkspaceOptions;
+        this.searchTerm = oldState.searchTerm;
+        this.replaceTerm = oldState.replaceTerm;
+        this.showReplaceField = oldState.showReplaceField;
+        this.refresh();
     }
 
     onAfterAttach(msg: Message) {
@@ -97,6 +133,13 @@ export class SearchInWorkspaceWidget extends BaseWidget {
         const f = document.getElementById("search-input-field");
         if (f) {
             (f as HTMLInputElement).value = this.searchTerm;
+        }
+    }
+
+    onAfterShow(msg: Message) {
+        const f = document.getElementById("search-input-field");
+        if (f) {
+            (f as HTMLInputElement).focus();
         }
     }
 
@@ -124,14 +167,14 @@ export class SearchInWorkspaceWidget extends BaseWidget {
     }
 
     protected renderControlButtons(): h.Child {
-        const refreshButton = this.renderControlButton(`refresh${this.hasResults || this.searchTerm !== "" ? " enabled" : ""}`, this.refresh);
-        const collapseAllButton = this.renderControlButton(`collapse-all${this.hasResults ? " enabled" : ""}`, this.collapseAll);
-        const clearButton = this.renderControlButton(`clear${this.hasResults ? " enabled" : ""}`, this.clear);
+        const refreshButton = this.renderControlButton(`refresh${this.hasResults || this.searchTerm !== "" ? " enabled" : ""}`, 'Refresh', this.refresh);
+        const collapseAllButton = this.renderControlButton(`collapse-all${this.hasResults ? " enabled" : ""}`, 'Collapse All', this.collapseAll);
+        const clearButton = this.renderControlButton(`clear${this.hasResults ? " enabled" : ""}`, 'Clear', this.clear);
         return h.div({ className: "controls button-container" }, refreshButton, collapseAllButton, clearButton);
     }
 
-    protected renderControlButton(btnClass: string, clickHandler: () => void): h.Child {
-        return h.span({ className: `btn ${btnClass}`, onclick: clickHandler });
+    protected renderControlButton(btnClass: string, title: string, clickHandler: () => void): h.Child {
+        return h.span({ className: `btn ${btnClass}`, title, onclick: clickHandler });
     }
 
     protected renderSearchAndReplace(): h.Child {
@@ -180,6 +223,7 @@ export class SearchInWorkspaceWidget extends BaseWidget {
             id: "replace-input-field",
             type: "text",
             placeholder: "Replace",
+            value: this.replaceTerm,
             onkeyup: e => {
                 if (e.target) {
                     if (Key.ENTER.keyCode === e.keyCode) {
@@ -212,7 +256,8 @@ export class SearchInWorkspaceWidget extends BaseWidget {
         const matchCaseOption = this.renderOptionElement(this.matchCaseState);
         const wholeWordOption = this.renderOptionElement(this.wholeWordState);
         const regexOption = this.renderOptionElement(this.regExpState);
-        return h.div({ className: "option-buttons" }, matchCaseOption, wholeWordOption, regexOption);
+        const includeIgnoredOption = this.renderOptionElement(this.includeIgnoredState);
+        return h.div({ className: "option-buttons" }, matchCaseOption, wholeWordOption, regexOption, includeIgnoredOption);
     }
 
     protected renderOptionElement(opt: SearchFieldState): h.Child {
@@ -234,6 +279,7 @@ export class SearchInWorkspaceWidget extends BaseWidget {
         this.searchInWorkspaceOptions.matchCase = this.matchCaseState.enabled;
         this.searchInWorkspaceOptions.matchWholeWord = this.wholeWordState.enabled;
         this.searchInWorkspaceOptions.useRegExp = this.regExpState.enabled;
+        this.searchInWorkspaceOptions.includeIgnored = this.includeIgnoredState.enabled;
     }
 
     protected renderSearchDetails(): h.Child {
@@ -262,7 +308,7 @@ export class SearchInWorkspaceWidget extends BaseWidget {
         const label = h.div({ className: "label" }, "files to " + kind);
         const input = h.input({
             type: "text",
-            value: "",
+            value: this.searchInWorkspaceOptions[kind],
             onkeyup: e => {
                 if (e.target) {
                     if (Key.ENTER.keyCode === e.keyCode) {

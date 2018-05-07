@@ -59,6 +59,9 @@ export class RipgrepSearchInWorkspaceServer implements SearchInWorkspaceServer {
         if (options && options.matchWholeWord) {
             args.push("--word-regexp");
         }
+        if (options && options.includeIgnored) {
+            args.push("-uu");
+        }
         args.push(options && options.useRegExp ? "--regexp" : "--fixed-strings");
 
         return args;

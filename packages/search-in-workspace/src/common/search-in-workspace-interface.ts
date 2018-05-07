@@ -25,6 +25,10 @@ export interface SearchInWorkspaceOptions {
      */
     useRegExp?: boolean;
     /**
+     * Include all .gitignored and hidden files.
+     */
+    includeIgnored?: boolean;
+    /**
      * Glob pattern for matching files and directories to include the search.
      */
     include?: string;
