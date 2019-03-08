@@ -16,13 +16,13 @@
 
 import * as theia from '@theia/plugin';
 import URI from 'vscode-uri/lib/umd';
-import { Selection } from '../../api/plugin-api';
-import { Range } from '../../api/model';
 import * as Converter from '../type-converters';
 import { createToken } from '../token-provider';
 import { DocumentsExtImpl } from '../documents';
 import { Diagnostics } from './diagnostics';
 import { CodeActionKind } from '../types-impl';
+import * as lsp from 'vscode-languageserver-types';
+import { Selection } from '../../api/model';
 
 export class CodeActionAdapter {
 
@@ -33,7 +33,7 @@ export class CodeActionAdapter {
         private readonly pluginId: string
     ) { }
 
-    provideCodeAction(resource: URI, rangeOrSelection: Range | Selection, context: monaco.languages.CodeActionContext): Promise<monaco.languages.CodeAction[]> {
+    provideCodeAction(resource: URI, rangeOrSelection: lsp.Range | Selection, context: lsp.CodeActionContext): Promise<lsp.CodeAction[]> {
         const document = this.document.getDocumentData(resource);
         if (!document) {
             return Promise.reject(new Error(`There are no document for ${resource}`));
@@ -53,14 +53,14 @@ export class CodeActionAdapter {
 
         const codeActionContext: theia.CodeActionContext = {
             diagnostics: allDiagnostics,
-            only: context.only ? new CodeActionKind(context.only) : undefined
+            only: context.only ? new CodeActionKind(context.only[0]) : undefined
         };
 
         return Promise.resolve(this.provider.provideCodeActions(doc, ran, codeActionContext, createToken())).then(commandsOrActions => {
             if (!Array.isArray(commandsOrActions) || commandsOrActions.length === 0) {
                 return undefined!;
             }
-            const result: monaco.languages.CodeAction[] = [];
+            const result: lsp.CodeAction[] = [];
             for (const candidate of commandsOrActions) {
                 if (!candidate) {
                     continue;
@@ -84,8 +84,8 @@ export class CodeActionAdapter {
                     result.push({
                         title: candidate.title,
                         command: candidate.command && Converter.toInternalCommand(candidate.command),
-                        diagnostics: candidate.diagnostics && candidate.diagnostics.map(Converter.convertDiagnosticToMarkerData) as monaco.editor.IMarker[],
-                        edit: candidate.edit && Converter.fromWorkspaceEdit(candidate.edit) as monaco.languages.WorkspaceEdit,
+                        diagnostics: candidate.diagnostics && candidate.diagnostics.map(Converter.fromDiagnostic) as lsp.Diagnostic[],
+                        edit: candidate.edit && Converter.fromWorkspaceEdit(candidate.edit),
                         kind: candidate.kind && candidate.kind.value
                     });
                 }

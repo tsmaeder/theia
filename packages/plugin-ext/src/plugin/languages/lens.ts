@@ -16,8 +16,8 @@
 
 import URI from 'vscode-uri/lib/umd';
 import * as theia from '@theia/plugin';
+import * as lsp from 'vscode-languageserver-types';
 import { DocumentsExtImpl } from '../documents';
-import { CodeLensSymbol } from '../../api/model';
 import * as Converter from '../type-converters';
 import { ObjectIdentifier } from '../../common/object-identifier';
 import { createToken } from '../token-provider';
@@ -35,7 +35,7 @@ export class CodeLensAdapter {
         private readonly documents: DocumentsExtImpl,
     ) { }
 
-    provideCodeLenses(resource: URI): Promise<CodeLensSymbol[] | undefined> {
+    provideCodeLenses(resource: URI): Promise<lsp.CodeLens[] | undefined> {
         const document = this.documents.getDocumentData(resource);
         if (!document) {
             return Promise.reject(new Error(`There is no document for ${resource}`));
@@ -59,7 +59,7 @@ export class CodeLensAdapter {
         });
     }
 
-    resolveCodeLens(resource: URI, symbol: CodeLensSymbol): Promise<CodeLensSymbol | undefined> {
+    resolveCodeLens(resource: URI, symbol: lsp.CodeLens): Promise<lsp.CodeLens | undefined> {
         const lens = this.cache.get(ObjectIdentifier.of(symbol));
         if (!lens) {
             return Promise.resolve(undefined);

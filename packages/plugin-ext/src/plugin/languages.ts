@@ -22,10 +22,7 @@ import {
     SerializedRegExp,
     SerializedOnEnterRule,
     SerializedIndentationRule,
-    Position,
-    Selection,
     RawColorInfo,
-    WorkspaceEditDto,
 } from '../api/plugin-api';
 import { RPCProtocol } from '../api/rpc-protocol';
 import * as theia from '@theia/plugin';
@@ -36,25 +33,10 @@ import URI from 'vscode-uri/lib/umd';
 import { match as matchGlobPattern } from '../common/glob';
 import { UriComponents } from '../common/uri-components';
 import {
-    CompletionContext,
-    CompletionResultDto,
-    Completion,
-    SerializedDocumentFilter,
-    SignatureHelp,
-    Hover,
-    DocumentHighlight,
-    Range,
-    SingleEditOperation,
-    FormattingOptions,
-    Definition,
-    DefinitionLink,
-    DocumentLink,
-    CodeLensSymbol,
-    DocumentSymbol,
-    ReferenceContext,
-    Location,
-    ColorPresentation,
     RenameLocation,
+    SerializedDocumentFilter,
+    Selection,
+    CompletionContext,
 } from '../api/model';
 import { CompletionAdapter } from './languages/completion';
 import { Diagnostics } from './languages/diagnostics';
@@ -73,7 +55,7 @@ import { CodeLensAdapter } from './languages/lens';
 import { OutlineAdapter } from './languages/outline';
 import { ReferenceAdapter } from './languages/reference';
 import { WorkspaceSymbolAdapter } from './languages/workspace-symbol';
-import { SymbolInformation } from 'vscode-languageserver-types';
+import * as lsp from 'vscode-languageserver-types';
 import { FoldingProviderAdapter } from './languages/folding';
 import { ColorProviderAdapter } from './languages/color';
 import { RenameAdapter } from './languages/rename';
@@ -200,11 +182,11 @@ export class LanguagesExtImpl implements LanguagesExt {
     }
 
     // ### Completion begin
-    $provideCompletionItems(handle: number, resource: UriComponents, position: Position, context: CompletionContext): Promise<CompletionResultDto | undefined> {
+    $provideCompletionItems(handle: number, resource: UriComponents, position: lsp.Position, context: CompletionContext): Promise<lsp.CompletionList | undefined> {
         return this.withAdapter(handle, CompletionAdapter, adapter => adapter.provideCompletionItems(URI.revive(resource), position, context));
     }
 
-    $resolveCompletionItem(handle: number, resource: UriComponents, position: Position, completion: Completion): Promise<Completion> {
+    $resolveCompletionItem(handle: number, resource: UriComponents, position: lsp.Position, completion: lsp.CompletionItem): Promise<lsp.CompletionItem> {
         return this.withAdapter(handle, CompletionAdapter, adapter => adapter.resolveCompletionItem(URI.revive(resource), position, completion));
     }
 
@@ -220,7 +202,7 @@ export class LanguagesExtImpl implements LanguagesExt {
     // ### Completion end
 
     // ### Definition provider begin
-    $provideDefinition(handle: number, resource: UriComponents, position: Position): Promise<Definition | DefinitionLink[] | undefined> {
+    $provideDefinition(handle: number, resource: UriComponents, position: lsp.Position): Promise<lsp.Definition | lsp.DefinitionLink[] | undefined> {
         return this.withAdapter(handle, DefinitionAdapter, adapter => adapter.provideDefinition(URI.revive(resource), position));
     }
 
@@ -232,7 +214,7 @@ export class LanguagesExtImpl implements LanguagesExt {
     // ### Definition provider end
 
     // ### Signature help begin
-    $provideSignatureHelp(handle: number, resource: UriComponents, position: Position): Promise<SignatureHelp | undefined> {
+    $provideSignatureHelp(handle: number, resource: UriComponents, position: lsp.Position): Promise<lsp.SignatureHelp | undefined> {
         return this.withAdapter(handle, SignatureHelpAdapter, adapter => adapter.provideSignatureHelp(URI.revive(resource), position));
     }
 
@@ -254,7 +236,7 @@ export class LanguagesExtImpl implements LanguagesExt {
     // ### Diagnostics end
 
     // ### Implementation provider begin
-    $provideImplementation(handle: number, resource: UriComponents, position: Position): Promise<Definition | DefinitionLink[] | undefined> {
+    $provideImplementation(handle: number, resource: UriComponents, position: lsp.Position): Promise<lsp.Definition | lsp.DefinitionLink[] | undefined> {
         return this.withAdapter(handle, ImplementationAdapter, adapter => adapter.provideImplementation(URI.revive(resource), position));
     }
 
@@ -266,7 +248,7 @@ export class LanguagesExtImpl implements LanguagesExt {
     // ### Implementation provider end
 
     // ### Type Definition provider begin
-    $provideTypeDefinition(handle: number, resource: UriComponents, position: Position): Promise<Definition | DefinitionLink[] | undefined> {
+    $provideTypeDefinition(handle: number, resource: UriComponents, position: lsp.Position): Promise<lsp.Definition | lsp.DefinitionLink[] | undefined> {
         return this.withAdapter(handle, TypeDefinitionAdapter, adapter => adapter.provideTypeDefinition(URI.revive(resource), position));
     }
 
@@ -284,7 +266,7 @@ export class LanguagesExtImpl implements LanguagesExt {
         return this.createDisposable(callId);
     }
 
-    $provideHover(handle: number, resource: UriComponents, position: Position): Promise<Hover | undefined> {
+    $provideHover(handle: number, resource: UriComponents, position: lsp.Position): Promise<lsp.Hover | undefined> {
         return this.withAdapter(handle, HoverAdapter, adapter => adapter.provideHover(URI.revive(resource), position));
     }
     // ### Hover Provider end
@@ -296,7 +278,7 @@ export class LanguagesExtImpl implements LanguagesExt {
         return this.createDisposable(callId);
     }
 
-    $provideDocumentHighlights(handle: number, resource: UriComponents, position: Position): Promise<DocumentHighlight[] | undefined> {
+    $provideDocumentHighlights(handle: number, resource: UriComponents, position: lsp.Position): Promise<lsp.DocumentHighlight[] | undefined> {
         return this.withAdapter(handle, DocumentHighlightAdapter, adapter => adapter.provideDocumentHighlights(URI.revive(resource), position));
     }
     // ### Document Highlight Provider end
@@ -308,11 +290,11 @@ export class LanguagesExtImpl implements LanguagesExt {
         return this.createDisposable(callId);
     }
 
-    $provideWorkspaceSymbols(handle: number, query: string): PromiseLike<SymbolInformation[]> {
+    $provideWorkspaceSymbols(handle: number, query: string): PromiseLike<lsp.SymbolInformation[]> {
         return this.withAdapter(handle, WorkspaceSymbolAdapter, adapter => adapter.provideWorkspaceSymbols(query));
     }
 
-    $resolveWorkspaceSymbol(handle: number, symbol: SymbolInformation): PromiseLike<SymbolInformation> {
+    $resolveWorkspaceSymbol(handle: number, symbol: lsp.SymbolInformation): PromiseLike<lsp.SymbolInformation> {
         return this.withAdapter(handle, WorkspaceSymbolAdapter, adapter => adapter.resolveWorkspaceSymbol(symbol));
     }
     // ### WorkspaceSymbol Provider end
@@ -324,7 +306,7 @@ export class LanguagesExtImpl implements LanguagesExt {
         return this.createDisposable(callId);
     }
 
-    $provideDocumentFormattingEdits(handle: number, resource: UriComponents, options: FormattingOptions): Promise<SingleEditOperation[] | undefined> {
+    $provideDocumentFormattingEdits(handle: number, resource: UriComponents, options: lsp.FormattingOptions): Promise<lsp.TextEdit[] | undefined> {
         return this.withAdapter(handle, DocumentFormattingAdapter, adapter => adapter.provideDocumentFormattingEdits(URI.revive(resource), options));
     }
     // ### Document Formatting Edit end
@@ -336,7 +318,7 @@ export class LanguagesExtImpl implements LanguagesExt {
         return this.createDisposable(callId);
     }
 
-    $provideDocumentRangeFormattingEdits(handle: number, resource: UriComponents, range: Range, options: FormattingOptions): Promise<SingleEditOperation[] | undefined> {
+    $provideDocumentRangeFormattingEdits(handle: number, resource: UriComponents, range: lsp.Range, options: lsp.FormattingOptions): Promise<lsp.TextEdit[] | undefined> {
         return this.withAdapter(handle, RangeFormattingAdapter, adapter => adapter.provideDocumentRangeFormattingEdits(URI.revive(resource), range, options));
     }
     // ### Document Range Formatting Edit end
@@ -352,17 +334,17 @@ export class LanguagesExtImpl implements LanguagesExt {
         return this.createDisposable(callId);
     }
 
-    $provideOnTypeFormattingEdits(handle: number, resource: UriComponents, position: Position, ch: string, options: FormattingOptions): Promise<SingleEditOperation[] | undefined> {
+    $provideOnTypeFormattingEdits(handle: number, resource: UriComponents, position: lsp.Position, ch: string, options: lsp.FormattingOptions): Promise<lsp.TextEdit[] | undefined> {
         return this.withAdapter(handle, OnTypeFormattingAdapter, adapter => adapter.provideOnTypeFormattingEdits(URI.revive(resource), position, ch, options));
     }
     // ### On Type Formatting Edit end
 
     // ### Document Link Provider begin
-    $provideDocumentLinks(handle: number, resource: UriComponents): Promise<DocumentLink[] | undefined> {
+    $provideDocumentLinks(handle: number, resource: UriComponents): Promise<lsp.DocumentLink[] | undefined> {
         return this.withAdapter(handle, LinkProviderAdapter, adapter => adapter.provideLinks(URI.revive(resource)));
     }
 
-    $resolveDocumentLink(handle: number, link: DocumentLink): Promise<DocumentLink | undefined> {
+    $resolveDocumentLink(handle: number, link: lsp.DocumentLink): Promise<lsp.DocumentLink | undefined> {
         return this.withAdapter(handle, LinkProviderAdapter, adapter => adapter.resolveLink(link));
     }
 
@@ -391,9 +373,9 @@ export class LanguagesExtImpl implements LanguagesExt {
 
     $provideCodeActions(handle: number,
         resource: UriComponents,
-        rangeOrSelection: Range | Selection,
-        context: monaco.languages.CodeActionContext
-    ): Promise<monaco.languages.CodeAction[]> {
+        rangeOrSelection: lsp.Range | Selection,
+        context: lsp.CodeActionContext
+    ): Promise<lsp.CodeAction[]> {
         return this.withAdapter(handle, CodeActionAdapter, adapter => adapter.provideCodeAction(URI.revive(resource), rangeOrSelection, context));
     }
     // ### Code Actions Provider end
@@ -413,17 +395,17 @@ export class LanguagesExtImpl implements LanguagesExt {
         return result;
     }
 
-    $provideCodeLenses(handle: number, resource: UriComponents): Promise<CodeLensSymbol[] | undefined> {
+    $provideCodeLenses(handle: number, resource: UriComponents): Promise<lsp.CodeLens[] | undefined> {
         return this.withAdapter(handle, CodeLensAdapter, adapter => adapter.provideCodeLenses(URI.revive(resource)));
     }
 
-    $resolveCodeLens(handle: number, resource: UriComponents, symbol: CodeLensSymbol): Promise<CodeLensSymbol | undefined> {
+    $resolveCodeLens(handle: number, resource: UriComponents, symbol: lsp.CodeLens): Promise<lsp.CodeLens | undefined> {
         return this.withAdapter(handle, CodeLensAdapter, adapter => adapter.resolveCodeLens(URI.revive(resource), symbol));
     }
     // ### Code Lens Provider end
 
     // ### Code Reference Provider begin
-    $provideReferences(handle: number, resource: UriComponents, position: Position, context: ReferenceContext): Promise<Location[] | undefined> {
+    $provideReferences(handle: number, resource: UriComponents, position: lsp.Position, context: lsp.ReferenceContext): Promise<lsp.Location[] | undefined> {
         return this.withAdapter(handle, ReferenceAdapter, adapter => adapter.provideReferences(URI.revive(resource), position, context));
     }
 
@@ -441,7 +423,7 @@ export class LanguagesExtImpl implements LanguagesExt {
         return this.createDisposable(callId);
     }
 
-    $provideDocumentSymbols(handle: number, resource: UriComponents): Promise<DocumentSymbol[] | undefined> {
+    $provideDocumentSymbols(handle: number, resource: UriComponents): Promise<lsp.DocumentSymbol[] | undefined> {
         return this.withAdapter(handle, OutlineAdapter, adapter => adapter.provideDocumentSymbols(URI.revive(resource)));
     }
     // ### Document Symbol Provider end
@@ -457,7 +439,7 @@ export class LanguagesExtImpl implements LanguagesExt {
         return this.withAdapter(handle, ColorProviderAdapter, adapter => adapter.provideColors(URI.revive(resource)));
     }
 
-    $provideColorPresentations(handle: number, resource: UriComponents, colorInfo: RawColorInfo): Promise<ColorPresentation[]> {
+    $provideColorPresentations(handle: number, resource: UriComponents, colorInfo: RawColorInfo): Promise<lsp.ColorPresentation[]> {
         return this.withAdapter(handle, ColorProviderAdapter, adapter => adapter.provideColorPresentations(URI.revive(resource), colorInfo));
     }
     // ### Color Provider end
@@ -472,8 +454,7 @@ export class LanguagesExtImpl implements LanguagesExt {
     $provideFoldingRange(
         callId: number,
         resource: UriComponents,
-        context: theia.FoldingContext
-    ): Promise<monaco.languages.FoldingRange[] | undefined> {
+    ): Promise<lsp.FoldingRange[] | undefined> {
         return this.withAdapter(callId, FoldingProviderAdapter, adapter => adapter.provideFoldingRanges(URI.revive(resource), context));
     }
     // ### Folging Range Provider end
@@ -485,11 +466,11 @@ export class LanguagesExtImpl implements LanguagesExt {
         return this.createDisposable(callId);
     }
 
-    $provideRenameEdits(handle: number, resource: UriComponents, position: Position, newName: string): Promise<WorkspaceEditDto | undefined> {
+    $provideRenameEdits(handle: number, resource: UriComponents, position: lsp.Position, newName: string): Promise<lsp.WorkspaceEdit | undefined> {
         return this.withAdapter(handle, RenameAdapter, adapter => adapter.provideRenameEdits(URI.revive(resource), position, newName));
     }
 
-    $resolveRenameLocation(handle: number, resource: UriComponents, position: Position): Promise<RenameLocation | undefined> {
+    $resolveRenameLocation(handle: number, resource: UriComponents, position: lsp.Position): Promise<RenameLocation | undefined> {
         return this.withAdapter(handle, RenameAdapter, adapter => adapter.resolveRenameLocation(URI.revive(resource), position));
     }
     // ### Rename Provider end

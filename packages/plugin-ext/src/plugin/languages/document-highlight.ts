@@ -16,11 +16,10 @@
 
 import URI from 'vscode-uri/lib/umd';
 import * as theia from '@theia/plugin';
+import * as lsp from 'vscode-languageserver-types';
 import { DocumentsExtImpl } from '../documents';
 import * as types from '../types-impl';
 import * as Converter from '../type-converters';
-import { Position } from '../../api/plugin-api';
-import { DocumentHighlight } from '../../api/model';
 import { createToken } from '../token-provider';
 
 export class DocumentHighlightAdapter {
@@ -30,7 +29,7 @@ export class DocumentHighlightAdapter {
         private readonly documents: DocumentsExtImpl) {
     }
 
-    provideDocumentHighlights(resource: URI, position: Position): Promise<DocumentHighlight[] | undefined> {
+    provideDocumentHighlights(resource: URI, position: lsp.Position): Promise<lsp.DocumentHighlight[] | undefined> {
         const documentData = this.documents.getDocumentData(resource);
         if (!documentData) {
             return Promise.reject(new Error(`There is no document for ${resource}`));
@@ -45,7 +44,7 @@ export class DocumentHighlightAdapter {
             }
 
             if (this.isDocumentHighlightArray(documentHighlights)) {
-                const highlights: DocumentHighlight[] = [];
+                const highlights: lsp.DocumentHighlight[] = [];
 
                 for (const highlight of documentHighlights) {
                     highlights.push(Converter.fromDocumentHighlight(highlight));

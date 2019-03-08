@@ -14,17 +14,19 @@
  * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
  ********************************************************************************/
 
-import { EditorPosition, Selection, Position, DecorationOptions, WorkspaceEditDto, ResourceTextEditDto, ResourceFileEditDto, TaskDto, ProcessTaskDto } from '../api/plugin-api';
+import { EditorPosition, DecorationOptions, TaskDto, ProcessTaskDto } from '../api/plugin-api';
 import * as model from '../api/model';
 import * as theia from '@theia/plugin';
 import * as types from './types-impl';
 import { LanguageSelector, LanguageFilter, RelativePattern } from './languages';
 import { isMarkdownString } from './markdown-string';
 import URI from 'vscode-uri';
+import * as lsp from 'vscode-languageserver-types';
 
 const SIDE_GROUP = -2;
 const ACTIVE_GROUP = -1;
 import { SymbolInformation, Range as R, Position as P, SymbolKind as S, Location as L } from 'vscode-languageserver-types';
+import { TheiaDockPanel } from '@theia/core/src/browser/shell/theia-dock-panel';
 
 export function toViewColumn(ep?: EditorPosition): theia.ViewColumn | undefined {
     if (typeof ep !== 'number') {
@@ -71,51 +73,44 @@ export function toWebviewPanelShowOptions(options: theia.ViewColumn | theia.Webv
     };
 }
 
-export function toSelection(selection: Selection): types.Selection {
-    const { selectionStartLineNumber, selectionStartColumn, positionLineNumber, positionColumn } = selection;
-    const start = new types.Position(selectionStartLineNumber - 1, selectionStartColumn - 1);
-    const end = new types.Position(positionLineNumber - 1, positionColumn - 1);
+export function toSelection(selection: model.Selection): types.Selection {
+    const start = toPosition(selection.anchor);
+    const end = toPosition(selection.active);
     return new types.Selection(start, end);
 }
 
-export function fromSelection(selection: types.Selection): Selection {
+export function fromSelection(selection: types.Selection): model.Selection {
     const { active, anchor } = selection;
     return {
-        selectionStartLineNumber: anchor.line + 1,
-        selectionStartColumn: anchor.character + 1,
-        positionLineNumber: active.line + 1,
-        positionColumn: active.character + 1
+        active: fromPosition(active),
+        anchor: fromPosition(anchor)
     };
 }
 
-export function toRange(range: model.Range): types.Range {
+export function toRange(range: lsp.Range): types.Range {
     // if (!range) {
     //     return undefined;
     // }
 
-    const { startLineNumber, startColumn, endLineNumber, endColumn } = range;
-    return new types.Range(startLineNumber - 1, startColumn - 1, endLineNumber - 1, endColumn - 1);
+    return new types.Range(toPosition(range.start), toPosition(range.end));
 }
 
-export function fromRange(range: theia.Range | undefined): model.Range | undefined {
+export function fromRange(range: theia.Range | undefined): lsp.Range | undefined {
     if (!range) {
         return undefined;
     }
-    const { start, end } = range;
     return {
-        startLineNumber: start.line + 1,
-        startColumn: start.character + 1,
-        endLineNumber: end.line + 1,
-        endColumn: end.character + 1
+        start: fromPosition(range.start),
+        end: fromPosition(range.end)
     };
 }
 
-export function fromPosition(position: types.Position): Position {
-    return { lineNumber: position.line + 1, column: position.character + 1 };
+export function fromPosition(position: theia.Position): lsp.Position {
+    return { line: position.line, character: position.character };
 }
 
-export function toPosition(position: Position): types.Position {
-    return new types.Position(position.lineNumber - 1, position.column - 1);
+export function toPosition(position: lsp.Position): types.Position {
+    return new types.Position(position.line, position.character);
 }
 
 // tslint:disable-next-line:no-any
@@ -157,8 +152,16 @@ export function fromRangeOrRangeWithMessage(ranges: theia.Range[] | theia.Decora
     }
 }
 
-export function fromManyMarkdown(markup: (theia.MarkdownString | theia.MarkedString)[]): model.MarkdownString[] {
-    return markup.map(fromMarkdown);
+export function fromManyMarkdown(markup: (theia.MarkedString)[]): lsp.MarkupContent {
+    let combined: string = '';
+    for (const block of markup) {
+        const markDown = fromMarkdown(block);
+        combined = combined + markDown.value;
+    }
+    return <lsp.MarkupContent>{
+        kind: lsp.MarkupKind.Markdown,
+        value: combined
+    };
 }
 
 interface Codeblock {
@@ -173,16 +176,16 @@ function isCodeblock(thing: any): thing is Codeblock {
         && typeof (<Codeblock>thing).value === 'string';
 }
 
-export function fromMarkdown(markup: theia.MarkdownString | theia.MarkedString): model.MarkdownString {
+export function fromMarkdown(markup: theia.MarkedString): lsp.MarkupContent {
     if (isCodeblock(markup)) {
         const { language, value } = markup;
-        return { value: '```' + language + '\n' + value + '\n```\n' };
+        return { kind: lsp.MarkupKind.Markdown, value: '```' + language + '\n' + value + '\n```\n' };
     } else if (isMarkdownString(markup)) {
-        return markup;
+        return { kind: lsp.MarkupKind.Markdown, value: markup.value };
     } else if (typeof markup === 'string') {
-        return { value: <string>markup };
+        return { kind: lsp.MarkupKind.PlainText, value: <string>markup };
     } else {
-        return { value: '' };
+        return { kind: lsp.MarkupKind.PlainText, value: '' };
     }
 }
 
@@ -220,73 +223,73 @@ function isRelativePattern(obj: {}): obj is theia.RelativePattern {
     return rp && typeof rp.base === 'string' && typeof rp.pattern === 'string';
 }
 
-export function fromCompletionItemKind(kind?: types.CompletionItemKind): model.CompletionType {
+export function fromCompletionItemKind(kind?: types.CompletionItemKind): lsp.CompletionItemKind {
     switch (kind) {
-        case types.CompletionItemKind.Method: return 'method';
-        case types.CompletionItemKind.Function: return 'function';
-        case types.CompletionItemKind.Constructor: return 'constructor';
-        case types.CompletionItemKind.Field: return 'field';
-        case types.CompletionItemKind.Variable: return 'variable';
-        case types.CompletionItemKind.Class: return 'class';
-        case types.CompletionItemKind.Interface: return 'interface';
-        case types.CompletionItemKind.Struct: return 'struct';
-        case types.CompletionItemKind.Module: return 'module';
-        case types.CompletionItemKind.Property: return 'property';
-        case types.CompletionItemKind.Unit: return 'unit';
-        case types.CompletionItemKind.Value: return 'value';
-        case types.CompletionItemKind.Constant: return 'constant';
-        case types.CompletionItemKind.Enum: return 'enum';
-        case types.CompletionItemKind.EnumMember: return 'enum-member';
-        case types.CompletionItemKind.Keyword: return 'keyword';
-        case types.CompletionItemKind.Snippet: return 'snippet';
-        case types.CompletionItemKind.Text: return 'text';
-        case types.CompletionItemKind.Color: return 'color';
-        case types.CompletionItemKind.File: return 'file';
-        case types.CompletionItemKind.Reference: return 'reference';
-        case types.CompletionItemKind.Folder: return 'folder';
-        case types.CompletionItemKind.Event: return 'event';
-        case types.CompletionItemKind.Operator: return 'operator';
-        case types.CompletionItemKind.TypeParameter: return 'type-parameter';
+        case types.CompletionItemKind.Method: return lsp.CompletionItemKind.Method;
+        case types.CompletionItemKind.Function: return lsp.CompletionItemKind.Function;
+        case types.CompletionItemKind.Constructor: return lsp.CompletionItemKind.Constructor;
+        case types.CompletionItemKind.Field: return lsp.CompletionItemKind.Field;
+        case types.CompletionItemKind.Variable: return lsp.CompletionItemKind.Variable;
+        case types.CompletionItemKind.Class: return lsp.CompletionItemKind.Class;
+        case types.CompletionItemKind.Interface: return lsp.CompletionItemKind.Interface;
+        case types.CompletionItemKind.Struct: return lsp.CompletionItemKind.Struct;
+        case types.CompletionItemKind.Module: return lsp.CompletionItemKind.Module;
+        case types.CompletionItemKind.Property: return lsp.CompletionItemKind.Property;
+        case types.CompletionItemKind.Unit: return lsp.CompletionItemKind.Unit;
+        case types.CompletionItemKind.Value: return lsp.CompletionItemKind.Value;
+        case types.CompletionItemKind.Constant: return lsp.CompletionItemKind.Constant;
+        case types.CompletionItemKind.Enum: return lsp.CompletionItemKind.Enum;
+        case types.CompletionItemKind.EnumMember: return lsp.CompletionItemKind.EnumMember;
+        case types.CompletionItemKind.Keyword: return lsp.CompletionItemKind.Keyword;
+        case types.CompletionItemKind.Snippet: return lsp.CompletionItemKind.Snippet;
+        case types.CompletionItemKind.Text: return lsp.CompletionItemKind.Text;
+        case types.CompletionItemKind.Color: return lsp.CompletionItemKind.Color;
+        case types.CompletionItemKind.File: return lsp.CompletionItemKind.File;
+        case types.CompletionItemKind.Reference: return lsp.CompletionItemKind.Reference;
+        case types.CompletionItemKind.Folder: return lsp.CompletionItemKind.Folder;
+        case types.CompletionItemKind.Event: return lsp.CompletionItemKind.Event;
+        case types.CompletionItemKind.Operator: return lsp.CompletionItemKind.Operator;
+        case types.CompletionItemKind.TypeParameter: return lsp.CompletionItemKind.TypeParameter;
     }
-    return 'property';
+    return lsp.CompletionItemKind.Property;
 }
 
-export function toCompletionItemKind(type?: model.CompletionType): types.CompletionItemKind {
+export function toCompletionItemKind(type?: lsp.CompletionItemKind): types.CompletionItemKind {
     if (type) {
         switch (type) {
-            case 'method': return types.CompletionItemKind.Method;
-            case 'function': return types.CompletionItemKind.Function;
-            case 'constructor': return types.CompletionItemKind.Constructor;
-            case 'field': return types.CompletionItemKind.Field;
-            case 'variable': return types.CompletionItemKind.Variable;
-            case 'class': return types.CompletionItemKind.Class;
-            case 'interface': return types.CompletionItemKind.Interface;
-            case 'struct': return types.CompletionItemKind.Struct;
-            case 'module': return types.CompletionItemKind.Module;
-            case 'property': return types.CompletionItemKind.Property;
-            case 'unit': return types.CompletionItemKind.Unit;
-            case 'value': return types.CompletionItemKind.Value;
-            case 'constant': return types.CompletionItemKind.Constant;
-            case 'enum': return types.CompletionItemKind.Enum;
-            case 'enum-member': return types.CompletionItemKind.EnumMember;
-            case 'keyword': return types.CompletionItemKind.Keyword;
-            case 'snippet': return types.CompletionItemKind.Snippet;
-            case 'text': return types.CompletionItemKind.Text;
-            case 'color': return types.CompletionItemKind.Color;
-            case 'file': return types.CompletionItemKind.File;
-            case 'reference': return types.CompletionItemKind.Reference;
-            case 'folder': return types.CompletionItemKind.Folder;
-            case 'event': return types.CompletionItemKind.Event;
-            case 'operator': return types.CompletionItemKind.Operator;
-            case 'type-parameter': return types.CompletionItemKind.TypeParameter;
+            case lsp.CompletionItemKind.Method: return types.CompletionItemKind.Method;
+            case lsp.CompletionItemKind.Function: return types.CompletionItemKind.Function;
+            case lsp.CompletionItemKind.Constructor: return types.CompletionItemKind.Constructor;
+            case lsp.CompletionItemKind.Field: return types.CompletionItemKind.Field;
+            case lsp.CompletionItemKind.Variable: return types.CompletionItemKind.Variable;
+            case lsp.CompletionItemKind.Class: return types.CompletionItemKind.Class;
+            case lsp.CompletionItemKind.Interface: return types.CompletionItemKind.Interface;
+            case lsp.CompletionItemKind.Struct: return types.CompletionItemKind.Struct;
+            case lsp.CompletionItemKind.Module: return types.CompletionItemKind.Module;
+            case lsp.CompletionItemKind.Property: return types.CompletionItemKind.Property;
+            case lsp.CompletionItemKind.Unit: return types.CompletionItemKind.Unit;
+            case lsp.CompletionItemKind.Value: return types.CompletionItemKind.Value;
+            case lsp.CompletionItemKind.Constant: return types.CompletionItemKind.Constant;
+            case lsp.CompletionItemKind.Enum: return types.CompletionItemKind.Enum;
+            case lsp.CompletionItemKind.EnumMember: return types.CompletionItemKind.EnumMember;
+            case lsp.CompletionItemKind.Keyword: return types.CompletionItemKind.Keyword;
+            case lsp.CompletionItemKind.Snippet: return types.CompletionItemKind.Snippet;
+            case lsp.CompletionItemKind.Text: return types.CompletionItemKind.Text;
+            case lsp.CompletionItemKind.Color: return types.CompletionItemKind.Color;
+            case lsp.CompletionItemKind.File: return types.CompletionItemKind.File;
+            case lsp.CompletionItemKind.Reference: return types.CompletionItemKind.Reference;
+            case lsp.CompletionItemKind.Folder: return types.CompletionItemKind.Folder;
+            case lsp.CompletionItemKind.Event: return types.CompletionItemKind.Event;
+            case lsp.CompletionItemKind.Operator: return types.CompletionItemKind.Operator;
+            case lsp.CompletionItemKind.TypeParameter: return types.CompletionItemKind.TypeParameter;
         }
     }
     return types.CompletionItemKind.Property;
 }
 
-export function fromTextEdit(edit: theia.TextEdit): model.SingleEditOperation {
-    return <model.SingleEditOperation>{
-        text: edit.newText,
+export function fromTextEdit(edit: theia.TextEdit): lsp.TextEdit {
+    return <lsp.TextEdit>{
+        newText: edit.newText,
         range: fromRange(edit.range)
     };
 }
@@ -307,124 +310,59 @@ export function fromLanguageSelector(selector: theia.DocumentSelector): Language
     }
 }
 
-export function convertDiagnosticToMarkerData(diagnostic: theia.Diagnostic): model.MarkerData {
-    return {
-        code: convertCode(diagnostic.code),
-        severity: convertSeverity(diagnostic.severity),
-        message: diagnostic.message,
-        source: diagnostic.source,
-        startLineNumber: diagnostic.range.start.line + 1,
-        startColumn: diagnostic.range.start.character + 1,
-        endLineNumber: diagnostic.range.end.line + 1,
-        endColumn: diagnostic.range.end.character + 1,
-        relatedInformation: convertRelatedInformation(diagnostic.relatedInformation),
-        tags: convertTags(diagnostic.tags)
-    };
-}
-
-function convertCode(code: string | number | undefined): string | undefined {
-    if (typeof code === 'number') {
-        return String(code);
-    } else {
-        return code;
-    }
-}
-
-function convertSeverity(severity: types.DiagnosticSeverity): types.MarkerSeverity {
-    switch (severity) {
-        case types.DiagnosticSeverity.Error: return types.MarkerSeverity.Error;
-        case types.DiagnosticSeverity.Warning: return types.MarkerSeverity.Warning;
-        case types.DiagnosticSeverity.Information: return types.MarkerSeverity.Info;
-        case types.DiagnosticSeverity.Hint: return types.MarkerSeverity.Hint;
-    }
-}
-
-function convertRelatedInformation(diagnosticsRelatedInformation: theia.DiagnosticRelatedInformation[] | undefined): model.RelatedInformation[] | undefined {
-    if (!diagnosticsRelatedInformation) {
-        return undefined;
-    }
-
-    const relatedInformation: model.RelatedInformation[] = [];
-    for (const item of diagnosticsRelatedInformation) {
-        relatedInformation.push({
-            resource: item.location.uri.toString(),
-            message: item.message,
-            startLineNumber: item.location.range.start.line + 1,
-            startColumn: item.location.range.start.character + 1,
-            endLineNumber: item.location.range.end.line + 1,
-            endColumn: item.location.range.end.character + 1
-        });
-    }
-    return relatedInformation;
-}
-
-function convertTags(tags: types.DiagnosticTag[] | undefined): types.MarkerTag[] | undefined {
-    if (!tags) {
-        return undefined;
-    }
-
-    const markerTags: types.MarkerTag[] = [];
-    for (const tag of tags) {
-        switch (tag) {
-            case types.DiagnosticTag.Unnecessary: markerTags.push(types.MarkerTag.Unnecessary);
-        }
-    }
-    return markerTags;
-}
-
-export function fromHover(hover: theia.Hover): model.Hover {
-    return <model.Hover>{
+export function fromHover(hover: theia.Hover): lsp.Hover {
+    return <lsp.Hover>{
         range: fromRange(hover.range),
         contents: fromManyMarkdown(hover.contents)
     };
 }
 
-export function fromLocation(location: theia.Location): model.Location {
-    return <model.Location>{
-        uri: location.uri,
+export function fromLocation(location: theia.Location): lsp.Location {
+    return <lsp.Location>{
+        uri: location.uri.toString(),
         range: fromRange(location.range)
     };
 }
 
-export function fromDefinitionLink(definitionLink: theia.DefinitionLink): model.DefinitionLink {
-    return <model.DefinitionLink>{
-        uri: definitionLink.targetUri,
-        range: fromRange(definitionLink.targetRange),
-        origin: definitionLink.originSelectionRange ? fromRange(definitionLink.originSelectionRange) : undefined,
-        selectionRange: definitionLink.targetSelectionRange ? fromRange(definitionLink.targetSelectionRange) : undefined
+export function fromDefinitionLink(definitionLink: theia.DefinitionLink): lsp.DefinitionLink {
+    return <lsp.DefinitionLink>{
+        targetUri: definitionLink.targetUri.toString(),
+        targetRange: fromRange(definitionLink.targetRange),
+        originSelectionRange: definitionLink.originSelectionRange ? fromRange(definitionLink.originSelectionRange) : undefined,
+        targetSelectionRange: definitionLink.targetSelectionRange ? fromRange(definitionLink.targetSelectionRange) : undefined
     };
 }
 
-export function fromDocumentLink(definitionLink: theia.DocumentLink): model.DocumentLink {
-    return <model.DocumentLink>{
+export function fromDocumentLink(definitionLink: theia.DocumentLink): lsp.DocumentLink {
+    return <lsp.DocumentLink>{
         range: fromRange(definitionLink.range),
         url: definitionLink.target && definitionLink.target.toString()
     };
 }
 
-export function fromDocumentHighlightKind(kind?: theia.DocumentHighlightKind): model.DocumentHighlightKind | undefined {
+export function fromDocumentHighlightKind(kind?: theia.DocumentHighlightKind): lsp.DocumentHighlightKind | undefined {
     switch (kind) {
-        case types.DocumentHighlightKind.Text: return model.DocumentHighlightKind.Text;
-        case types.DocumentHighlightKind.Read: return model.DocumentHighlightKind.Read;
-        case types.DocumentHighlightKind.Write: return model.DocumentHighlightKind.Write;
+        case types.DocumentHighlightKind.Text: return lsp.DocumentHighlightKind.Text;
+        case types.DocumentHighlightKind.Read: return lsp.DocumentHighlightKind.Read;
+        case types.DocumentHighlightKind.Write: return lsp.DocumentHighlightKind.Write;
     }
-    return model.DocumentHighlightKind.Text;
+    return lsp.DocumentHighlightKind.Text;
 }
 
-export function fromDocumentHighlight(documentHighlight: theia.DocumentHighlight): model.DocumentHighlight {
-    return <model.DocumentHighlight>{
+export function fromDocumentHighlight(documentHighlight: theia.DocumentHighlight): lsp.DocumentHighlight {
+    return <lsp.DocumentHighlight>{
         range: fromRange(documentHighlight.range),
         kind: fromDocumentHighlightKind(documentHighlight.kind)
     };
 }
 
-export function toInternalCommand(external: theia.Command): model.Command {
+export function toInternalCommand(external: theia.Command): lsp.Command {
     // we're deprecating Command.id, so it has to be optional.
     // Existing code will have compiled against a non - optional version of the field, so asserting it to exist is ok
     // tslint:disable-next-line: no-any
     return KnownCommands.map((external.command || external.id)!, external.arguments, (mappedId: string, mappedArgs: any[]) =>
         ({
-            id: mappedId,
+            command: mappedId,
             title: external.title || external.label || ' ',
             tooltip: external.tooltip,
             arguments: mappedArgs
@@ -436,8 +374,8 @@ export namespace KnownCommands {
     const mappings: { [id: string]: [string, (args: any[] | undefined) => any[] | undefined] } = {};
     mappings['editor.action.showReferences'] = ['textEditor.commands.showReferences', createConversionFunction(
         (uri: URI) => uri.toString(),
-        fromPositionToP,
-        toArrayConversion(fromLocationToL))];
+        fromPosition,
+        toArrayConversion(fromLocation))];
 
     export function map<T>(id: string, args: any[] | undefined, toDo: (mappedId: string, mappedArgs: any[] | undefined) => T): T {
         if (mappings[id]) {
@@ -464,19 +402,6 @@ export namespace KnownCommands {
             });
         };
     }
-    // tslint:enable: no-any
-    function fromPositionToP(p: theia.Position): P {
-        return P.create(p.line, p.character);
-    }
-
-    function fromRangeToR(r: theia.Range): R {
-        return R.create(fromPositionToP(r.start), fromPositionToP(r.end));
-    }
-
-    function fromLocationToL(l: theia.Location): L {
-        return L.create(l.uri.toString(), fromRangeToR(l.range));
-    }
-
 }
 
 function toArrayConversion<T, U>(f: (a: T) => U): (a: T[]) => U[] {
@@ -486,70 +411,87 @@ function toArrayConversion<T, U>(f: (a: T) => U): (a: T[]) => U[] {
 }
 
 // tslint:disable-next-line:no-any
-export function fromWorkspaceEdit(value: theia.WorkspaceEdit, documents?: any): WorkspaceEditDto {
-    const result: WorkspaceEditDto = {
-        edits: []
+export function fromWorkspaceEdit(value: theia.WorkspaceEdit, documents?: any): lsp.WorkspaceEdit {
+    const result: lsp.WorkspaceEdit = {
+        changes: {},
+        documentChanges: []
     };
     for (const entry of (value as types.WorkspaceEdit)._allEntries()) {
         const [uri, uriOrEdits] = entry;
         if (Array.isArray(uriOrEdits)) {
             // text edits
-            const doc = documents ? documents.getDocument(uri.toString()) : undefined;
-            result.edits.push(<ResourceTextEditDto>{ resource: uri, modelVersionId: doc && doc.version, edits: uriOrEdits.map(fromTextEdit) });
+            result.changes![uri.toString()] = uriOrEdits.map(fromTextEdit);
+
         } else {
+            const change = createFileChange(uri.toString(), uriOrEdits.toString(), entry[2]);
             // resource edits
-            result.edits.push(<ResourceFileEditDto>{ oldUri: uri, newUri: uriOrEdits, options: entry[2] });
+            if (change) {
+                result.documentChanges!.push(change);
+            }
         }
     }
     return result;
 }
 
+function createFileChange(oldUri: string, newUri: string, options?: types.FileOperationOptions) {
+    if (oldUri && newUri) {
+        return lsp.RenameFile.create(oldUri, newUri, options);
+    } else if (oldUri) {
+        return lsp.DeleteFile.create(oldUri, options);
+    } else if (newUri) {
+        return lsp.CreateFile.create(newUri, options);
+    } else {
+        console.warn('Resource change change with no old or new URI: ignoring');
+        return undefined;
+    }
+}
+
 export namespace SymbolKind {
     // tslint:disable-next-line:no-null-keyword
-    const fromMapping: { [kind: number]: model.SymbolKind } = Object.create(null);
-    fromMapping[model.SymbolKind.File] = model.SymbolKind.File;
-    fromMapping[model.SymbolKind.Module] = model.SymbolKind.Module;
-    fromMapping[model.SymbolKind.Namespace] = model.SymbolKind.Namespace;
-    fromMapping[model.SymbolKind.Package] = model.SymbolKind.Package;
-    fromMapping[model.SymbolKind.Class] = model.SymbolKind.Class;
-    fromMapping[model.SymbolKind.Method] = model.SymbolKind.Method;
-    fromMapping[model.SymbolKind.Property] = model.SymbolKind.Property;
-    fromMapping[model.SymbolKind.Field] = model.SymbolKind.Field;
-    fromMapping[model.SymbolKind.Constructor] = model.SymbolKind.Constructor;
-    fromMapping[model.SymbolKind.Enum] = model.SymbolKind.Enum;
-    fromMapping[model.SymbolKind.Interface] = model.SymbolKind.Interface;
-    fromMapping[model.SymbolKind.Function] = model.SymbolKind.Function;
-    fromMapping[model.SymbolKind.Variable] = model.SymbolKind.Variable;
-    fromMapping[model.SymbolKind.Constant] = model.SymbolKind.Constant;
-    fromMapping[model.SymbolKind.String] = model.SymbolKind.String;
-    fromMapping[model.SymbolKind.Number] = model.SymbolKind.Number;
-    fromMapping[model.SymbolKind.Boolean] = model.SymbolKind.Boolean;
-    fromMapping[model.SymbolKind.Array] = model.SymbolKind.Array;
-    fromMapping[model.SymbolKind.Object] = model.SymbolKind.Object;
-    fromMapping[model.SymbolKind.Key] = model.SymbolKind.Key;
-    fromMapping[model.SymbolKind.Null] = model.SymbolKind.Null;
-    fromMapping[model.SymbolKind.EnumMember] = model.SymbolKind.EnumMember;
-    fromMapping[model.SymbolKind.Struct] = model.SymbolKind.Struct;
-    fromMapping[model.SymbolKind.Event] = model.SymbolKind.Event;
-    fromMapping[model.SymbolKind.Operator] = model.SymbolKind.Operator;
-    fromMapping[model.SymbolKind.TypeParameter] = model.SymbolKind.TypeParameter;
+    const fromMapping: { [kind: number]: lsp.SymbolKind } = Object.create(null);
+    fromMapping[theia.SymbolKind.File] = lsp.SymbolKind.File;
+    fromMapping[theia.SymbolKind.Module] = lsp.SymbolKind.Module;
+    fromMapping[theia.SymbolKind.Namespace] = lsp.SymbolKind.Namespace;
+    fromMapping[theia.SymbolKind.Package] = lsp.SymbolKind.Package;
+    fromMapping[theia.SymbolKind.Class] = lsp.SymbolKind.Class;
+    fromMapping[theia.SymbolKind.Method] = lsp.SymbolKind.Method;
+    fromMapping[theia.SymbolKind.Property] = lsp.SymbolKind.Property;
+    fromMapping[theia.SymbolKind.Field] = lsp.SymbolKind.Field;
+    fromMapping[theia.SymbolKind.Constructor] = lsp.SymbolKind.Constructor;
+    fromMapping[theia.SymbolKind.Enum] = lsp.SymbolKind.Enum;
+    fromMapping[theia.SymbolKind.Interface] = lsp.SymbolKind.Interface;
+    fromMapping[theia.SymbolKind.Function] = lsp.SymbolKind.Function;
+    fromMapping[theia.SymbolKind.Variable] = lsp.SymbolKind.Variable;
+    fromMapping[theia.SymbolKind.Constant] = lsp.SymbolKind.Constant;
+    fromMapping[theia.SymbolKind.String] = lsp.SymbolKind.String;
+    fromMapping[theia.SymbolKind.Number] = lsp.SymbolKind.Number;
+    fromMapping[theia.SymbolKind.Boolean] = lsp.SymbolKind.Boolean;
+    fromMapping[theia.SymbolKind.Array] = lsp.SymbolKind.Array;
+    fromMapping[theia.SymbolKind.Object] = lsp.SymbolKind.Object;
+    fromMapping[theia.SymbolKind.Key] = lsp.SymbolKind.Key;
+    fromMapping[theia.SymbolKind.Null] = lsp.SymbolKind.Null;
+    fromMapping[theia.SymbolKind.EnumMember] = lsp.SymbolKind.EnumMember;
+    fromMapping[theia.SymbolKind.Struct] = lsp.SymbolKind.Struct;
+    fromMapping[theia.SymbolKind.Event] = lsp.SymbolKind.Event;
+    fromMapping[theia.SymbolKind.Operator] = lsp.SymbolKind.Operator;
+    fromMapping[theia.SymbolKind.TypeParameter] = lsp.SymbolKind.TypeParameter;
 
-    export function fromSymbolKind(kind: theia.SymbolKind): model.SymbolKind {
-        return fromMapping[kind] || model.SymbolKind.Property;
+    export function fromSymbolKind(kind: theia.SymbolKind): lsp.SymbolKind {
+        return fromMapping[kind] || lsp.SymbolKind.Property;
     }
 
-    export function toSymbolKind(kind: model.SymbolKind): theia.SymbolKind {
+    export function toSymbolKind(kind: lsp.SymbolKind): theia.SymbolKind {
         for (const k in fromMapping) {
             if (fromMapping[k] === kind) {
                 return Number(k);
             }
         }
-        return model.SymbolKind.Property;
+        return theia.SymbolKind.Property;
     }
 }
 
-export function fromDocumentSymbol(info: theia.DocumentSymbol): model.DocumentSymbol {
-    const result: model.DocumentSymbol = {
+export function fromDocumentSymbol(info: theia.DocumentSymbol): lsp.DocumentSymbol {
+    const result: lsp.DocumentSymbol = {
         name: info.name,
         detail: info.detail,
         range: fromRange(info.range)!,
@@ -803,26 +745,23 @@ export function toSymbolInformation(symbolInformation: SymbolInformation): theia
     };
 }
 
-export function fromFoldingRange(foldingRange: theia.FoldingRange): model.FoldingRange {
-    const range: model.FoldingRange = {
-        start: foldingRange.start + 1,
-        end: foldingRange.end + 1
-    };
+export function fromFoldingRange(foldingRange: theia.FoldingRange): lsp.FoldingRange {
+    const range = lsp.FoldingRange.create(foldingRange.start, foldingRange.end);
     if (foldingRange.kind) {
         range.kind = fromFoldingRangeKind(foldingRange.kind);
     }
     return range;
 }
 
-export function fromFoldingRangeKind(kind: theia.FoldingRangeKind | undefined): model.FoldingRangeKind | undefined {
+export function fromFoldingRangeKind(kind: theia.FoldingRangeKind | undefined): lsp.FoldingRangeKind | undefined {
     if (kind) {
         switch (kind) {
             case types.FoldingRangeKind.Comment:
-                return model.FoldingRangeKind.Comment;
+                return lsp.FoldingRangeKind.Comment;
             case types.FoldingRangeKind.Imports:
-                return model.FoldingRangeKind.Imports;
+                return lsp.FoldingRangeKind.Imports;
             case types.FoldingRangeKind.Region:
-                return model.FoldingRangeKind.Region;
+                return lsp.FoldingRangeKind.Region;
         }
     }
     return undefined;
@@ -836,10 +775,30 @@ export function toColor(color: [number, number, number, number]): types.Color {
     return new types.Color(color[0], color[1], color[2], color[3]);
 }
 
-export function fromColorPresentation(colorPresentation: theia.ColorPresentation): model.ColorPresentation {
+export function fromColorPresentation(colorPresentation: theia.ColorPresentation): lsp.ColorPresentation {
     return {
         label: colorPresentation.label,
         textEdit: colorPresentation.textEdit ? fromTextEdit(colorPresentation.textEdit) : undefined,
         additionalTextEdits: colorPresentation.additionalTextEdits ? colorPresentation.additionalTextEdits.map(value => fromTextEdit(value)) : undefined
     };
+}
+
+export function fromDiagnostic(diagnostic: theia.Diagnostic): lsp.Diagnostic {
+    return lsp.Diagnostic.create(fromRange(diagnostic.range)!,
+        diagnostic.message,
+        <lsp.DiagnosticSeverity>diagnostic.severity,
+        diagnostic.code,
+        diagnostic.source,
+        fromRelatedInformationArray(diagnostic.relatedInformation));
+}
+
+function fromRelatedInformationArray(info?: theia.DiagnosticRelatedInformation[]): lsp.DiagnosticRelatedInformation[] | undefined {
+    if (!info) {
+        return undefined;
+    }
+    return info.map(fromRelatedInformation);
+}
+
+function fromRelatedInformation(info: theia.DiagnosticRelatedInformation): lsp.DiagnosticRelatedInformation {
+    return lsp.DiagnosticRelatedInformation.create(fromLocation(info.location), info.message);
 }

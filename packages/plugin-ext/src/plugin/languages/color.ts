@@ -20,7 +20,7 @@ import { DocumentsExtImpl } from '@theia/plugin-ext/src/plugin/documents';
 import { createToken } from '../token-provider';
 import * as Converter from '../type-converters';
 import { RawColorInfo } from '@theia/plugin-ext/src/api/plugin-api';
-import { ColorPresentation } from '../../api/model';
+import * as lsp from 'vscode-languageserver-types';
 
 export class ColorProviderAdapter {
 
@@ -53,7 +53,7 @@ export class ColorProviderAdapter {
         });
     }
 
-    provideColorPresentations(resource: URI, raw: RawColorInfo): Promise<ColorPresentation[]> {
+    provideColorPresentations(resource: URI, raw: RawColorInfo): Promise<lsp.ColorPresentation[]> {
         const document = this.documents.getDocumentData(resource);
         if (!document) {
             return Promise.reject(new Error(`There are no document for ${resource}`));

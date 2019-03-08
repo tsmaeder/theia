@@ -17,7 +17,6 @@ import { MonacoEditor } from '@theia/monaco/lib/browser/monaco-editor';
 import {
     TextEditorConfiguration,
     EditorChangedPropertiesData,
-    Selection,
     TextEditorConfigurationUpdate,
     TextEditorRevealType,
     SingleEditOperation,
@@ -25,7 +24,7 @@ import {
     UndoStopOptions,
     DecorationOptions
 } from '../../api/plugin-api';
-import { Range } from '../../api/model';
+import { Selection } from '../../api/model';
 import { DisposableCollection, Emitter, Event } from '@theia/core';
 import { TextEditorCursorStyle, cursorStyleToString } from '../../common/editor-options';
 import { TextEditorLineNumbersStyle, EndOfLine } from '../../plugin/types-impl';

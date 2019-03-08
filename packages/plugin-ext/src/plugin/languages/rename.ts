@@ -16,11 +16,10 @@
 
 import URI from 'vscode-uri/lib/umd';
 import * as theia from '@theia/plugin';
+import * as lsp from 'vscode-languageserver-types';
 import * as Converter from '../type-converters';
 import * as model from '../../api/model';
 import { DocumentsExtImpl } from '@theia/plugin-ext/src/plugin/documents';
-import { WorkspaceEditDto } from '@theia/plugin-ext/src/common';
-import { Position } from '../../api/plugin-api';
 import { createToken } from '../token-provider';
 import { Range } from '../types-impl';
 import { isObject } from '../../common/types';
@@ -36,7 +35,7 @@ export class RenameAdapter {
         private readonly documents: DocumentsExtImpl
     ) { }
 
-    provideRenameEdits(resource: URI, position: Position, newName: string): Promise<WorkspaceEditDto | undefined> {
+    provideRenameEdits(resource: URI, position: lsp.Position, newName: string): Promise<lsp.WorkspaceEdit | undefined> {
         const document = this.documents.getDocumentData(resource);
         if (!document) {
             return Promise.reject(new Error(`There is no document for ${resource}`));
@@ -51,22 +50,11 @@ export class RenameAdapter {
             if (!value) {
                 return undefined;
             }
-
             return Converter.fromWorkspaceEdit(value);
-        }, error => {
-            const rejectReason = RenameAdapter.asMessage(error);
-            if (rejectReason) {
-                return <WorkspaceEditDto>{
-                    rejectReason,
-                    edits: undefined!
-                };
-            } else {
-                return Promise.reject<WorkspaceEditDto>(error);
-            }
         });
     }
 
-    resolveRenameLocation(resource: URI, position: Position): Promise<model.RenameLocation & model.Rejection | undefined> {
+    resolveRenameLocation(resource: URI, position: lsp.Position): Promise<model.RenameLocation | undefined> {
         if (typeof this.provider.prepareRename !== 'function') {
             return Promise.resolve(undefined);
         }
@@ -100,21 +88,10 @@ export class RenameAdapter {
                 console.warn('INVALID rename location: position line must be within range start/end lines');
                 return undefined;
             }
-            return {
+            return <model.RenameLocation>{
                 range: Converter.fromRange(range)!,
-                text: text!
+                placeholder: text!
             };
-        }, error => {
-            const rejectReason = RenameAdapter.asMessage(error);
-            if (rejectReason) {
-                return Promise.resolve(<model.RenameLocation & model.Rejection>{
-                    rejectReason,
-                    range: undefined!,
-                    text: undefined!
-                });
-            } else {
-                return Promise.reject(error);
-            }
         });
     }
 

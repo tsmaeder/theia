@@ -16,12 +16,12 @@
 
 import * as theia from '@theia/plugin';
 import { ModelChangedEvent, DocumentsMain } from '../api/plugin-api';
-import { Range as ARange } from '../api/model';
 import URI from 'vscode-uri';
 import { ok } from '../common/assert';
 import { Range, Position, EndOfLine } from './types-impl';
 import { PrefixSumComputer } from './prefix-sum-computer';
 import { getWordAtText, ensureValidWordDefinition } from './word-helper';
+import * as lsp from 'vscode-languageserver-types';
 
 const _modeId2WordDefinition = new Map<string, RegExp | null>();
 export function setWordDefinitionFor(modeId: string, wordDefinition: RegExp | null): void {
@@ -63,7 +63,7 @@ export class DocumentDataExt {
         for (let i = 0, len = changes.length; i < len; i++) {
             const change = changes[i];
             this.acceptDeleteRange(change.range);
-            this.acceptInsertText(new Position(change.range.startLineNumber, change.range.startColumn), change.text);
+            this.acceptInsertText(new Position(change.range.start.line, change.range.start.line), change.text);
         }
 
         this.versionId = e.versionId;
@@ -139,31 +139,30 @@ export class DocumentDataExt {
         }
     }
 
-    private acceptDeleteRange(range: ARange): void {
-
-        if (range.startLineNumber === range.endLineNumber) {
-            if (range.startColumn === range.endColumn) {
+    private acceptDeleteRange(range: lsp.Range): void {
+        if (range.start.line === range.end.line) {
+            if (range.start.character === range.end.character) {
                 // Nothing to delete
                 return;
             }
             // Delete text on the affected line
-            this.setLineText(range.startLineNumber - 1,
-                this.lines[range.startLineNumber - 1].substring(0, range.startColumn - 1)
-                + this.lines[range.startLineNumber - 1].substring(range.endColumn - 1)
+            this.setLineText(range.start.line,
+                this.lines[range.start.line].substring(0, range.start.character)
+                + this.lines[range.start.line].substring(range.end.character)
             );
             return;
         }
 
         // Take remaining text on last line and append it to remaining text on first line
-        this.setLineText(range.startLineNumber - 1,
-            this.lines[range.startLineNumber - 1].substring(0, range.startColumn - 1)
-            + this.lines[range.endLineNumber - 1].substring(range.endColumn - 1)
+        this.setLineText(range.start.line,
+            this.lines[range.start.line].substring(0, range.start.character)
+            + this.lines[range.end.line].substring(range.end.character)
         );
 
         // Delete middle lines
-        this.lines.splice(range.startLineNumber, range.endLineNumber - range.startLineNumber);
+        this.lines.splice(range.start.line, range.end.line - range.start.line);
         if (this.lineStarts) {
-            this.lineStarts.removeValues(range.startLineNumber, range.endLineNumber - range.startLineNumber);
+            this.lineStarts.removeValues(range.start.line, range.end.line - range.start.line);
         }
     }
 

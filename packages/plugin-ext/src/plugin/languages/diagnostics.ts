@@ -16,12 +16,12 @@
 
 import * as theia from '@theia/plugin';
 import { Event, Emitter } from '@theia/core/lib/common/event';
-import { convertDiagnosticToMarkerData } from '../type-converters';
-import { DiagnosticSeverity, MarkerSeverity } from '../types-impl';
-import { MarkerData } from '../../api/model';
+import { DiagnosticSeverity } from '../types-impl';
+import * as lsp from 'vscode-languageserver-types';
 import { RPCProtocol } from '../../api/rpc-protocol';
 import { PLUGIN_RPC_CONTEXT, LanguagesMain } from '../../api/plugin-api';
 import URI from 'vscode-uri';
+import { fromDiagnostic } from '../type-converters';
 
 export class DiagnosticCollection implements theia.DiagnosticCollection {
     private static DIAGNOSTICS_PRIORITY = [
@@ -204,26 +204,23 @@ export class DiagnosticCollection implements theia.DiagnosticCollection {
     }
 
     private sendChangesToEditor(uris: URI[]): void {
-        const markers: [string, MarkerData[]][] = [];
+        const markers: [string, lsp.Diagnostic[]][] = [];
         nextUri:
         for (const uri of uris) {
-            const uriMarkers: MarkerData[] = [];
+            const uriMarkers: lsp.Diagnostic[] = [];
             const uriDiagnostics = this.diagnostics.get(uri.toString());
             if (uriDiagnostics) {
                 if (uriDiagnostics.length > this.diagnosticsLimitPerResource) {
                     for (const severity of DiagnosticCollection.DIAGNOSTICS_PRIORITY) {
                         for (const diagnostic of uriDiagnostics) {
                             if (severity === diagnostic.severity) {
-                                if (uriMarkers.push(convertDiagnosticToMarkerData(diagnostic)) + 1 === this.diagnosticsLimitPerResource) {
+                                if (uriMarkers.push(fromDiagnostic(diagnostic)) + 1 === this.diagnosticsLimitPerResource) {
                                     const lastMarker = uriMarkers[uriMarkers.length - 1];
-                                    uriMarkers.push({
-                                        severity: MarkerSeverity.Info,
-                                        message: 'Limit of diagnostics is reached. ' + (uriDiagnostics.length - this.diagnosticsLimitPerResource) + ' items are hidden',
-                                        startLineNumber: lastMarker.startLineNumber,
-                                        startColumn: lastMarker.startColumn,
-                                        endLineNumber: lastMarker.endLineNumber,
-                                        endColumn: lastMarker.endColumn
-                                    });
+                                    uriMarkers.push(lsp.Diagnostic.create(
+                                        lsp.Range.create(lastMarker.range.start, lastMarker.range.end),
+                                        'Limit of diagnostics is reached. ' + (uriDiagnostics.length - this.diagnosticsLimitPerResource) + ' items are hidden',
+                                        lsp.DiagnosticSeverity.Information
+                                    ));
                                     markers.push([uri.toString(), uriMarkers]);
                                     continue nextUri;
                                 }
@@ -231,7 +228,7 @@ export class DiagnosticCollection implements theia.DiagnosticCollection {
                         }
                     }
                 } else {
-                    uriDiagnostics.forEach(diagnostic => uriMarkers.push(convertDiagnosticToMarkerData(diagnostic)));
+                    uriDiagnostics.forEach(diagnostic => uriMarkers.push(fromDiagnostic(diagnostic)));
                     markers.push([uri.toString(), uriMarkers]);
                 }
             } else {

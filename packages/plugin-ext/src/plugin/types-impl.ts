@@ -22,7 +22,6 @@ import URI from 'vscode-uri';
 import { relative } from '../common/paths-util';
 import { startsWithIgnoreCase } from '../common/strings';
 import { MarkdownString, isMarkdownString } from './markdown-string';
-import { SymbolKind } from '../api/model';
 
 export class Disposable {
     private disposable: undefined | (() => void);
@@ -1149,11 +1148,11 @@ export class SymbolInformation {
 
     name: string;
     location: Location;
-    kind: SymbolKind;
+    kind: theia.SymbolKind;
     containerName: undefined | string;
-    constructor(name: string, kind: SymbolKind, containerName: string, location: Location);
-    constructor(name: string, kind: SymbolKind, range: Range, uri?: URI, containerName?: string);
-    constructor(name: string, kind: SymbolKind, rangeOrContainer: string | Range, locationOrUri?: Location | URI, containerName?: string) {
+    constructor(name: string, kind: theia.SymbolKind, containerName: string, location: Location);
+    constructor(name: string, kind: theia.SymbolKind, range: Range, uri?: URI, containerName?: string);
+    constructor(name: string, kind: theia.SymbolKind, rangeOrContainer: string | Range, locationOrUri?: Location | URI, containerName?: string) {
         this.name = name;
         this.kind = kind;
         this.containerName = containerName;
@@ -1175,7 +1174,7 @@ export class SymbolInformation {
     toJSON(): any {
         return {
             name: this.name,
-            kind: SymbolKind[this.kind],
+            kind: theia.SymbolKind[this.kind],
             location: this.location,
             containerName: this.containerName
         };
@@ -1198,12 +1197,12 @@ export class DocumentSymbol {
 
     name: string;
     detail: string;
-    kind: SymbolKind;
+    kind: theia.SymbolKind;
     range: Range;
     selectionRange: Range;
     children: DocumentSymbol[];
 
-    constructor(name: string, detail: string, kind: SymbolKind, range: Range, selectionRange: Range) {
+    constructor(name: string, detail: string, kind: theia.SymbolKind, range: Range, selectionRange: Range) {
         this.name = name;
         this.detail = detail;
         this.kind = kind;

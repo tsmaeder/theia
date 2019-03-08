@@ -27,32 +27,14 @@ import { ConfigurationTarget } from '../plugin/types-impl';
 import {
     SerializedDocumentFilter,
     CompletionContext,
-    MarkdownString,
-    Range,
-    Completion,
-    CompletionResultDto,
-    MarkerData,
-    SignatureHelp,
-    Hover,
-    DocumentHighlight,
     FormattingOptions,
-    SingleEditOperation as ModelSingleEditOperation,
-    Definition,
-    DefinitionLink,
-    DocumentLink,
-    CodeLensSymbol,
-    Command,
-    TextEdit,
-    DocumentSymbol,
-    ReferenceContext,
     FileWatcherSubscriberOptions,
     FileChangeEvent,
     TextDocumentShowOptions,
     WorkspaceRootsChangeEvent,
-    Location,
     Breakpoint,
-    ColorPresentation,
-    RenameLocation,
+    Selection,
+    RenameLocation
 } from './model';
 import { ExtPluginApi } from '../common/plugin-ext-api-contribution';
 import { KeysToAnyValues, KeysToKeysToAnyValue } from '../common/types';
@@ -60,7 +42,7 @@ import { CancellationToken, Progress, ProgressOptions } from '@theia/plugin';
 import { IJSONSchema, IJSONSchemaSnippet } from '@theia/core/lib/common/json-schema';
 import { DebuggerDescription } from '@theia/debug/lib/common/debug-service';
 import { DebugProtocol } from 'vscode-debugprotocol';
-import { SymbolInformation } from 'vscode-languageserver-types';
+import * as lsp from 'vscode-languageserver-types';
 
 export interface PluginInitData {
     plugins: PluginMetadata[];
@@ -180,8 +162,6 @@ export interface ConnectionMain {
     $createConnection(id: string): Promise<void>;
     $deleteConnection(id: string): Promise<void>;
     $sendMessage(id: string, message: string): void;
-    $createConnection(id: string): Promise<void>;
-    $deleteConnection(id: string): Promise<void>;
 }
 
 export interface ConnectionExt {
@@ -467,30 +447,6 @@ export enum EditorPosition {
     THREE = 2
 }
 
-export interface Position {
-    readonly lineNumber: number;
-    readonly column: number;
-}
-
-export interface Selection {
-    /**
-     * The line number on which the selection has started.
-     */
-    readonly selectionStartLineNumber: number;
-    /**
-     * The column on `selectionStartLineNumber` where the selection has started.
-     */
-    readonly selectionStartColumn: number;
-    /**
-     * The line number on which the selection has ended.
-     */
-    readonly positionLineNumber: number;
-    /**
-     * The column on `positionLineNumber` where the selection has ended.
-     */
-    readonly positionColumn: number;
-}
-
 export interface TextEditorConfiguration {
     tabSize: number;
     insertSpaces: boolean;
@@ -520,7 +476,7 @@ export interface SelectionChangeEvent {
 export interface EditorChangedPropertiesData {
     options?: TextEditorConfiguration;
     selections?: SelectionChangeEvent;
-    visibleRanges?: Range[];
+    visibleRanges?: lsp.Range[];
 }
 
 export interface TextEditorPositionData {
@@ -533,7 +489,7 @@ export interface TextEditorsExt {
 }
 
 export interface SingleEditOperation {
-    range: Range;
+    range: lsp.Range;
     text?: string;
     forceMoveMarkers?: boolean;
 }
@@ -629,8 +585,8 @@ export interface DecorationInstanceRenderOptions extends ThemeDecorationInstance
 }
 
 export interface DecorationOptions {
-    range: Range;
-    hoverMessage?: MarkdownString | MarkdownString[];
+    range: lsp.Range;
+    hoverMessage?: lsp.MarkupContent | lsp.MarkupContent[];
     renderOptions?: DecorationInstanceRenderOptions;
 }
 
@@ -643,11 +599,11 @@ export interface TextEditorsMain {
     $trySetOptions(id: string, options: TextEditorConfigurationUpdate): Promise<void>;
     $trySetDecorations(id: string, key: string, ranges: DecorationOptions[]): Promise<void>;
     $trySetDecorationsFast(id: string, key: string, ranges: number[]): Promise<void>;
-    $tryRevealRange(id: string, range: Range, revealType: TextEditorRevealType): Promise<void>;
-    $trySetSelections(id: string, selections: Selection[]): Promise<void>;
+    $tryRevealRange(id: string, range: lsp.Range, revealType: TextEditorRevealType): Promise<void>;
+    $trySetSelections(id: string, selections: lsp.Range[]): Promise<void>;
     $tryApplyEdits(id: string, modelVersionId: number, edits: SingleEditOperation[], opts: ApplyEditsOptions): Promise<boolean>;
-    $tryApplyWorkspaceEdit(workspaceEditDto: WorkspaceEditDto): Promise<boolean>;
-    $tryInsertSnippet(id: string, template: string, selections: Range[], opts: UndoStopOptions): Promise<boolean>;
+    $tryApplyWorkspaceEdit(workspaceEditDto: lsp.WorkspaceEdit): Promise<boolean>;
+    $tryInsertSnippet(id: string, template: string, selections: lsp.Range[], opts: UndoStopOptions): Promise<boolean>;
     // $getDiffInformation(id: string): Promise<editorCommon.ILineChange[]>;
 }
 
@@ -665,7 +621,7 @@ export interface TextEditorAddData {
     documentUri: UriComponents;
     options: TextEditorConfiguration;
     selections: Selection[];
-    visibleRanges: Range[];
+    visibleRanges: lsp.Range[];
     editorPosition?: EditorPosition;
 }
 
@@ -682,7 +638,7 @@ export interface EditorsAndDocumentsExt {
 }
 
 export interface ModelContentChange {
-    readonly range: Range;
+    readonly range: lsp.Range;
     readonly rangeOffset: number;
     readonly rangeLength: number;
     readonly text: string;
@@ -784,29 +740,10 @@ export interface SerializedLanguageConfiguration {
     onEnterRules?: SerializedOnEnterRule[];
 }
 
-export interface CodeActionDto {
-    title: string;
-    edit?: WorkspaceEditDto;
-    diagnostics?: MarkerData[];
-    command?: Command;
-    kind?: string;
-}
-
 export interface ResourceFileEditDto {
     oldUri: UriComponents;
     newUri: UriComponents;
     options: FileOperationOptions;
-}
-
-export interface ResourceTextEditDto {
-    resource: UriComponents;
-    modelVersionId?: number;
-    edits: TextEdit[];
-}
-
-export interface WorkspaceEditDto {
-    edits: (ResourceFileEditDto | ResourceTextEditDto)[];
-    rejectReason?: string;
 }
 
 export interface LanguagesContributionExt {
@@ -843,47 +780,46 @@ export interface ProcessTaskDto extends TaskDto, CommandProperties {
 }
 
 export interface LanguagesExt {
-    $provideCompletionItems(handle: number, resource: UriComponents, position: Position, context: CompletionContext): Promise<CompletionResultDto | undefined>;
-    $resolveCompletionItem(handle: number, resource: UriComponents, position: Position, completion: Completion): Promise<Completion>;
+    $provideCompletionItems(handle: number, resource: UriComponents, position: lsp.Position, context: CompletionContext): Promise<lsp.CompletionList | undefined>;
+    $resolveCompletionItem(handle: number, resource: UriComponents, position: lsp.Position, completion: lsp.CompletionItem): Promise<lsp.CompletionItem>;
     $releaseCompletionItems(handle: number, id: number): void;
-    $provideImplementation(handle: number, resource: UriComponents, position: Position): Promise<Definition | DefinitionLink[] | undefined>;
-    $provideTypeDefinition(handle: number, resource: UriComponents, position: Position): Promise<Definition | DefinitionLink[] | undefined>;
-    $provideDefinition(handle: number, resource: UriComponents, position: Position): Promise<Definition | DefinitionLink[] | undefined>;
-    $provideReferences(handle: number, resource: UriComponents, position: Position, context: ReferenceContext): Promise<Location[] | undefined>;
-    $provideSignatureHelp(handle: number, resource: UriComponents, position: Position): Promise<SignatureHelp | undefined>;
-    $provideHover(handle: number, resource: UriComponents, position: Position): Promise<Hover | undefined>;
-    $provideDocumentHighlights(handle: number, resource: UriComponents, position: Position): Promise<DocumentHighlight[] | undefined>;
-    $provideDocumentFormattingEdits(handle: number, resource: UriComponents, options: FormattingOptions): Promise<ModelSingleEditOperation[] | undefined>;
-    $provideDocumentRangeFormattingEdits(handle: number, resource: UriComponents, range: Range, options: FormattingOptions): Promise<ModelSingleEditOperation[] | undefined>;
+    $provideImplementation(handle: number, resource: UriComponents, position: lsp.Position): Promise<lsp.Definition | lsp.DefinitionLink[] | undefined>;
+    $provideTypeDefinition(handle: number, resource: UriComponents, position: lsp.Position): Promise<lsp.Definition | lsp.DefinitionLink[] | undefined>;
+    $provideDefinition(handle: number, resource: UriComponents, position: lsp.Position): Promise<lsp.Definition | lsp.DefinitionLink[] | undefined>;
+    $provideReferences(handle: number, resource: UriComponents, position: lsp.Position, context: lsp.ReferenceContext): Promise<lsp.Location[] | undefined>;
+    $provideSignatureHelp(handle: number, resource: UriComponents, position: lsp.Position): Promise<lsp.SignatureHelp | undefined>;
+    $provideHover(handle: number, resource: UriComponents, position: lsp.Position): Promise<lsp.Hover | undefined>;
+    $provideDocumentHighlights(handle: number, resource: UriComponents, position: lsp.Position): Promise<lsp.DocumentHighlight[] | undefined>;
+    $provideDocumentFormattingEdits(handle: number, resource: UriComponents, options: FormattingOptions): Promise<lsp.TextEdit[] | undefined>;
+    $provideDocumentRangeFormattingEdits(handle: number, resource: UriComponents, range: lsp.Range, options: FormattingOptions): Promise<lsp.TextEdit[] | undefined>;
     $provideOnTypeFormattingEdits(
         handle: number,
         resource: UriComponents,
-        position: Position,
+        position: lsp.Position,
         ch: string,
         options: FormattingOptions
-    ): Promise<ModelSingleEditOperation[] | undefined>;
-    $provideDocumentLinks(handle: number, resource: UriComponents): Promise<DocumentLink[] | undefined>;
-    $resolveDocumentLink(handle: number, link: DocumentLink): Promise<DocumentLink | undefined>;
-    $provideCodeLenses(handle: number, resource: UriComponents): Promise<CodeLensSymbol[] | undefined>;
-    $resolveCodeLens(handle: number, resource: UriComponents, symbol: CodeLensSymbol): Promise<CodeLensSymbol | undefined>;
+    ): Promise<lsp.TextEdit[] | undefined>;
+    $provideDocumentLinks(handle: number, resource: UriComponents): Promise<lsp.DocumentLink[] | undefined>;
+    $resolveDocumentLink(handle: number, link: lsp.DocumentLink): Promise<lsp.DocumentLink | undefined>;
+    $provideCodeLenses(handle: number, resource: UriComponents): Promise<lsp.CodeLens[] | undefined>;
+    $resolveCodeLens(handle: number, resource: UriComponents, symbol: lsp.CodeLens): Promise<lsp.CodeLens | undefined>;
     $provideCodeActions(
         handle: number,
         resource: UriComponents,
-        rangeOrSelection: Range | Selection,
-        context: monaco.languages.CodeActionContext
-    ): Promise<monaco.languages.CodeAction[]>;
-    $provideDocumentSymbols(handle: number, resource: UriComponents): Promise<DocumentSymbol[] | undefined>;
-    $provideWorkspaceSymbols(handle: number, query: string): PromiseLike<SymbolInformation[]>;
-    $resolveWorkspaceSymbol(handle: number, symbol: SymbolInformation): PromiseLike<SymbolInformation>;
+        rangeOrSelection: lsp.Range | Selection,
+        context: lsp.CodeActionContext
+    ): Promise<lsp.CodeAction[]>;
+    $provideDocumentSymbols(handle: number, resource: UriComponents): Promise<lsp.DocumentSymbol[] | undefined>;
+    $provideWorkspaceSymbols(handle: number, query: string): PromiseLike<lsp.SymbolInformation[]>;
+    $resolveWorkspaceSymbol(handle: number, symbol: lsp.SymbolInformation): PromiseLike<lsp.SymbolInformation>;
     $provideFoldingRange(
         handle: number,
-        resource: UriComponents,
-        context: monaco.languages.FoldingContext
-    ): PromiseLike<monaco.languages.FoldingRange[] | undefined>;
-    $provideDocumentColors(handle: number, resource: UriComponents): PromiseLike<RawColorInfo[]>;
-    $provideColorPresentations(handle: number, resource: UriComponents, colorInfo: RawColorInfo): PromiseLike<ColorPresentation[]>;
-    $provideRenameEdits(handle: number, resource: UriComponents, position: Position, newName: string): PromiseLike<WorkspaceEditDto | undefined>;
-    $resolveRenameLocation(handle: number, resource: UriComponents, position: Position): PromiseLike<RenameLocation | undefined>;
+        resource: UriComponents
+    ): PromiseLike<lsp.FoldingRange[] | undefined>;
+    $provideDocumentColors(handle: number, resource: UriComponents): PromiseLike<lsp.ColorInformation[]>;
+    $provideColorPresentations(handle: number, resource: UriComponents, colorInfo: lsp.ColorInformation): PromiseLike<lsp.ColorPresentation[]>;
+    $provideRenameEdits(handle: number, resource: UriComponents, position: lsp.Position, newName: string): PromiseLike<lsp.WorkspaceEdit | undefined>;
+    $resolveRenameLocation(handle: number, resource: UriComponents, position: lsp.Position): PromiseLike<RenameLocation | undefined>;
 }
 
 export interface LanguagesMain {
@@ -900,7 +836,7 @@ export interface LanguagesMain {
     $registerDocumentHighlightProvider(handle: number, selector: SerializedDocumentFilter[]): void;
     $registerQuickFixProvider(handle: number, selector: SerializedDocumentFilter[], codeActionKinds?: string[]): void;
     $clearDiagnostics(id: string): void;
-    $changeDiagnostics(id: string, delta: [string, MarkerData[]][]): void;
+    $changeDiagnostics(id: string, delta: [string, lsp.Diagnostic[]][]): void;
     $registerDocumentFormattingSupport(handle: number, selector: SerializedDocumentFilter[]): void;
     $registerRangeFormattingProvider(handle: number, selector: SerializedDocumentFilter[]): void;
     $registerOnTypeFormattingProvider(handle: number, selector: SerializedDocumentFilter[], autoFormatTriggerCharacters: string[]): void;
@@ -1049,5 +985,5 @@ export interface TasksMain {
 
 export interface RawColorInfo {
     color: [number, number, number, number];
-    range: Range;
+    range: lsp.Range;
 }

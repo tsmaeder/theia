@@ -16,10 +16,9 @@
 
 import URI from 'vscode-uri/lib/umd';
 import * as theia from '@theia/plugin';
+import * as lsp from 'vscode-languageserver-types';
 import { DocumentsExtImpl } from '../documents';
-import { ReferenceContext, Location } from '../../api/model';
 import * as Converter from '../type-converters';
-import { Position } from '../../api/plugin-api';
 import { createToken } from '../token-provider';
 import { isLocationArray } from './util';
 
@@ -30,7 +29,7 @@ export class ReferenceAdapter {
         private readonly documents: DocumentsExtImpl
     ) { }
 
-    provideReferences(resource: URI, position: Position, context: ReferenceContext): Promise<Location[] | undefined> {
+    provideReferences(resource: URI, position: lsp.Position, context: lsp.ReferenceContext): Promise<lsp.Location[] | undefined> {
         const documentData = this.documents.getDocumentData(resource);
         if (!documentData) {
             return Promise.reject(new Error(`There is no document for ${resource}`));
@@ -45,7 +44,7 @@ export class ReferenceAdapter {
             }
 
             if (isLocationArray(reference)) {
-                const locations: Location[] = [];
+                const locations: lsp.Location[] = [];
 
                 for (const location of reference) {
                     locations.push(Converter.fromLocation(location));

@@ -16,8 +16,8 @@
 
 import URI from 'vscode-uri/lib/umd';
 import * as theia from '@theia/plugin';
+import * as lsp from 'vscode-languageserver-types';
 import { DocumentsExtImpl } from '../documents';
-import { DocumentLink } from '../../api/model';
 import * as Converter from '../type-converters';
 import { ObjectIdentifier } from '../../common/object-identifier';
 import { createToken } from '../token-provider';
@@ -31,7 +31,7 @@ export class LinkProviderAdapter {
         private readonly documents: DocumentsExtImpl
     ) { }
 
-    provideLinks(resource: URI): Promise<DocumentLink[] | undefined> {
+    provideLinks(resource: URI): Promise<lsp.DocumentLink[] | undefined> {
         const document = this.documents.getDocumentData(resource);
         if (!document) {
             return Promise.reject(new Error(`There is no document for ${resource}`));
@@ -43,7 +43,7 @@ export class LinkProviderAdapter {
             if (!Array.isArray(links)) {
                 return undefined;
             }
-            const result: DocumentLink[] = [];
+            const result: lsp.DocumentLink[] = [];
             for (const link of links) {
                 const data = Converter.fromDocumentLink(link);
                 const id = this.cacheId++;
@@ -55,7 +55,7 @@ export class LinkProviderAdapter {
         });
     }
 
-    resolveLink(link: DocumentLink): Promise<DocumentLink | undefined> {
+    resolveLink(link: lsp.DocumentLink): Promise<lsp.DocumentLink | undefined> {
         if (typeof this.provider.resolveDocumentLink !== 'function') {
             return Promise.resolve(undefined);
         }

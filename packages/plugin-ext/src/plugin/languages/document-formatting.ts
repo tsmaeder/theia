@@ -15,10 +15,10 @@
  ********************************************************************************/
 
 import * as theia from '@theia/plugin';
+import * as lsp from 'vscode-languageserver-types';
 import { DocumentsExtImpl } from '../documents';
 import * as Converter from '../type-converters';
 import URI from 'vscode-uri/lib/umd';
-import { FormattingOptions, SingleEditOperation } from '../../api/model';
 import { createToken } from '../token-provider';
 
 export class DocumentFormattingAdapter {
@@ -28,7 +28,7 @@ export class DocumentFormattingAdapter {
         private readonly documents: DocumentsExtImpl
     ) { }
 
-    provideDocumentFormattingEdits(resource: URI, options: FormattingOptions): Promise<SingleEditOperation[] | undefined> {
+    provideDocumentFormattingEdits(resource: URI, options: lsp.FormattingOptions): Promise<lsp.TextEdit[] | undefined> {
         const document = this.documents.getDocumentData(resource);
         if (!document) {
             return Promise.reject(new Error(`There are no document for ${resource}`));

@@ -21,28 +21,27 @@ import {
     SerializedIndentationRule,
     SerializedOnEnterRule,
     MAIN_RPC_CONTEXT,
-    LanguagesExt,
-    WorkspaceEditDto,
-    ResourceTextEditDto,
-    ResourceFileEditDto,
+    LanguagesExt
 } from '../../api/plugin-api';
 import { interfaces } from 'inversify';
-import { SerializedDocumentFilter, MarkerData, Range, WorkspaceSymbolProvider, RelatedInformation, MarkerSeverity } from '../../api/model';
+import { SerializedDocumentFilter, WorkspaceSymbolProvider } from '../../api/model';
 import { RPCProtocol } from '../../api/rpc-protocol';
 import { fromLanguageSelector } from '../../plugin/type-converters';
 import { LanguageSelector } from '../../plugin/languages';
-import { DocumentFilter, MonacoModelIdentifier, testGlob, getLanguages } from 'monaco-languageclient/lib';
+import { DocumentFilter, MonacoModelIdentifier, testGlob, getLanguages, MonacoToProtocolConverter, ProtocolToMonacoConverter } from 'monaco-languageclient/lib';
 import { DisposableCollection, Emitter } from '@theia/core';
 import { MonacoLanguages } from '@theia/monaco/lib/browser/monaco-languages';
 import URI from 'vscode-uri/lib/umd';
 import CoreURI from '@theia/core/lib/common/uri';
 import { ProblemManager } from '@theia/markers/lib/browser';
-import * as vst from 'vscode-languageserver-types';
+import * as lsp from 'vscode-languageserver-types';
 
 export class LanguagesMainImpl implements LanguagesMain {
 
     private ml: MonacoLanguages;
     private problemManager: ProblemManager;
+    private m2p: MonacoToProtocolConverter;
+    private p2m: ProtocolToMonacoConverter;
 
     private readonly proxy: LanguagesExt;
     private readonly disposables = new Map<number, monaco.IDisposable>();
@@ -50,6 +49,8 @@ export class LanguagesMainImpl implements LanguagesMain {
         this.proxy = rpc.getProxy(MAIN_RPC_CONTEXT.LANGUAGES_EXT);
         this.ml = container.get(MonacoLanguages);
         this.problemManager = container.get(ProblemManager);
+        this.m2p = container.get(MonacoToProtocolConverter);
+        this.p2m = container.get(ProtocolToMonacoConverter);
     }
 
     $getLanguages(): Promise<string[]> {
@@ -76,26 +77,137 @@ export class LanguagesMainImpl implements LanguagesMain {
         this.disposables.set(handle, monaco.languages.setLanguageConfiguration(languageId, config));
     }
 
+    private asPosition(position: monaco.Position): lsp.Position {
+        return this.m2p.asPosition(position.lineNumber, position.column);
+    }
+
+    private asColor(color: monaco.languages.IColor): lsp.Color {
+        return {
+            red: color.red,
+            green: color.green,
+            blue: color.blue,
+            alpha: color.alpha
+        }
+    }
+
+    private asColorInformation(info: monaco.languages.IColorInformation): lsp.ColorInformation {
+        return {
+            color: this.asColor(info.color),
+            range: this.m2p.asRange(info.range)
+        }
+    }
+
+    private asLocationLink(link: lsp.LocationLink | lsp.Location): monaco.languages.DefinitionLink {
+        if (lsp.LocationLink.is(link)) {
+            return {
+                origin: this.p2m.asRange(link.originSelectionRange),
+                range: this.p2m.asRange(link.targetRange),
+                selectionRange: this.p2m.asRange(link.targetSelectionRange),
+                uri: monaco.Uri.parse(link.targetUri)
+            };
+        } else {
+            return {
+                range: this.p2m.asRange(link.range),
+                uri: monaco.Uri.parse(link.uri)
+            }
+        }
+    }
+
+    private asSuggestion(item: lsp.CompletionItem, position: lsp.Position): monaco.modes.ISuggestion {
+        const result = <monaco.modes.ISuggestion & { wrapped: lsp.Position }>{
+            label: item.label,
+            type: this.asSuggestionType(item.kind),
+            detail: item.detail,
+            documentation: item.documentation,
+            filterText: item.filterText,
+            sortText: item.sortText,
+            preselect: item.preselect,
+            commitCharacters: item.commitCharacters,
+            additionalTextEdits: this.p2m.asTextEdits(item.additionalTextEdits),
+            command: this.p2m.asCommand(item.command),
+            snippetType: this.asSnippetType(item.insertTextFormat),
+            wrapped: position
+        };
+        if (item.textEdit) {
+            result.insertText = item.textEdit.newText;
+            result.overwriteBefore = position.character - item.textEdit.range.start.character;
+            result.overwriteAfter = item.textEdit.range.end.character - position.character;
+        } else {
+            result.insertText = item.insertText || '';
+        }
+
+        return result;
+    }
+
+
+
+    private asSuggestionType(kind?: lsp.CompletionItemKind): monaco.modes.SuggestionType {
+        switch (kind) {
+            case lsp.CompletionItemKind.Text: return 'text';
+            case lsp.CompletionItemKind.Method: return 'method';
+            case lsp.CompletionItemKind.Function: return 'function';
+            case lsp.CompletionItemKind.Constructor: return 'constructor';
+            case lsp.CompletionItemKind.Field: return 'field';
+            case lsp.CompletionItemKind.Variable: return 'variable';
+            case lsp.CompletionItemKind.Class: return 'class';
+            case lsp.CompletionItemKind.Interface: return 'interface';
+            case lsp.CompletionItemKind.Module: return 'module';
+            case lsp.CompletionItemKind.Property: return 'property';
+            case lsp.CompletionItemKind.Unit: return 'unit';
+            case lsp.CompletionItemKind.Value: return 'value';
+            case lsp.CompletionItemKind.Enum: return 'enum';
+            case lsp.CompletionItemKind.Keyword: return 'keyword';
+            case lsp.CompletionItemKind.Snippet: return 'snippet';
+            case lsp.CompletionItemKind.Color: return 'color';
+            case lsp.CompletionItemKind.File: return 'file';
+            case lsp.CompletionItemKind.Reference: return 'reference';
+            case lsp.CompletionItemKind.Folder: return 'folder';
+            case lsp.CompletionItemKind.EnumMember: return 'enum-member';
+            case lsp.CompletionItemKind.Constant: return 'constant';
+            case lsp.CompletionItemKind.Struct: return 'struct';
+            case lsp.CompletionItemKind.Event: return 'event';
+            case lsp.CompletionItemKind.Operator: return 'operator';
+            case lsp.CompletionItemKind.TypeParameter: return 'type-parameter';
+        }
+        return 'method';
+    }
+
+    private asSnippetType(type?: lsp.InsertTextFormat): monaco.modes.SnippetType | undefined {
+        if (!type) {
+            return undefined;
+        }
+        if (type === lsp.InsertTextFormat.PlainText) {
+            return 'internal';
+        }
+        return 'textmate';
+    }
+
+    private asCompletionItem(item: monaco.modes.ISuggestion, position: lsp.Position): lsp.CompletionItem {
+    }
+
     $registerCompletionSupport(handle: number, selector: SerializedDocumentFilter[], triggerCharacters: string[], supportsResolveDetails: boolean): void {
+
         this.disposables.set(handle, monaco.modes.SuggestRegistry.register(fromLanguageSelector(selector)!, {
             triggerCharacters,
             provideCompletionItems: (model: monaco.editor.ITextModel,
                 position: monaco.Position,
                 context: monaco.modes.SuggestContext,
-                token: monaco.CancellationToken): Thenable<monaco.modes.ISuggestResult> =>
-                Promise.resolve(this.proxy.$provideCompletionItems(handle, model.uri, position, context)).then(result => {
+                token: monaco.CancellationToken): Thenable<monaco.modes.ISuggestResult> => {
+                const lspPosition = this.asPosition(position);
+                return this.proxy.$provideCompletionItems(handle, model.uri, lspPosition, context).then(result => {
                     if (!result) {
                         return undefined!;
                     }
                     return {
-                        suggestions: result.completions,
-                        incomplete: result.incomplete,
+                        suggestions: result.items.map(item => this.asSuggestion(item, lspPosition)),
+                        incomplete: result.isIncomplete,
                         // tslint:disable-next-line:no-any
-                        dispose: () => this.proxy.$releaseCompletionItems(handle, (<any>result)._id)
+                        dispose: () => this.proxy.$releaseCompletionItems(handle, (<any>result).id)
                     };
-                }),
+                })
+            },
             resolveCompletionItem: supportsResolveDetails
-                ? (model, position, suggestion, token) => Promise.resolve(this.proxy.$resolveCompletionItem(handle, model.uri, position, suggestion))
+                ? (model, position, suggestion, token) => Promise.resolve(this.proxy.$resolveCompletionItem(handle, model.uri, this.asPosition(position), this.asCompletionItem(suggestion))
                 : undefined
         }));
     }
@@ -130,7 +242,7 @@ export class LanguagesMainImpl implements LanguagesMain {
                 if (!this.matchModel(selector, MonacoModelIdentifier.fromModel(model))) {
                     return undefined!;
                 }
-                return this.proxy.$provideReferences(handle, model.uri, position, context).then(result => {
+                return this.proxy.$provideReferences(handle, model.uri, this.asPosition(position), context).then(result => {
                     if (!result) {
                         return undefined!;
                     }
@@ -138,7 +250,7 @@ export class LanguagesMainImpl implements LanguagesMain {
                     if (Array.isArray(result)) {
                         const references: monaco.languages.Location[] = [];
                         for (const item of result) {
-                            references.push({ ...item, uri: monaco.Uri.revive(item.uri) });
+                            references.push(this.p2m.asLocation(item));
                         }
                         return references;
                     }
@@ -167,10 +279,10 @@ export class LanguagesMainImpl implements LanguagesMain {
         }
     }
 
-    $changeDiagnostics(id: string, delta: [string, MarkerData[]][]): void {
+    $changeDiagnostics(id: string, delta: [string, lsp.Diagnostic[]][]): void {
         for (const [uriString, markers] of delta) {
             const uri = new CoreURI(uriString);
-            this.problemManager.setMarkers(uri, id, markers.map(reviveMarker));
+            this.problemManager.setMarkers(uri, id, markers);
         }
     }
 
@@ -192,7 +304,7 @@ export class LanguagesMainImpl implements LanguagesMain {
                 if (!this.matchModel(selector, MonacoModelIdentifier.fromModel(model))) {
                     return undefined!;
                 }
-                return this.proxy.$provideImplementation(handle, model.uri, position).then(result => {
+                return this.proxy.$provideImplementation(handle, model.uri, this.asPosition(position)).then(result => {
                     if (!result) {
                         return undefined!;
                     }
@@ -201,15 +313,12 @@ export class LanguagesMainImpl implements LanguagesMain {
                         // using DefinitionLink because Location is mandatory part of DefinitionLink
                         const definitionLinks: monaco.languages.DefinitionLink[] = [];
                         for (const item of result) {
-                            definitionLinks.push({ ...item, uri: monaco.Uri.revive(item.uri) });
+                            definitionLinks.push(this.asLocationLink(item));
                         }
                         return definitionLinks;
                     } else {
                         // single Location
-                        return <monaco.languages.Location>{
-                            uri: monaco.Uri.revive(result.uri),
-                            range: result.range
-                        };
+                        return this.asLocationLink(result);
                     }
                 });
             }
@@ -234,7 +343,7 @@ export class LanguagesMainImpl implements LanguagesMain {
                 if (!this.matchModel(selector, MonacoModelIdentifier.fromModel(model))) {
                     return undefined!;
                 }
-                return this.proxy.$provideTypeDefinition(handle, model.uri, position).then(result => {
+                return this.proxy.$provideTypeDefinition(handle, model.uri, this.asPosition(position)).then(result => {
                     if (!result) {
                         return undefined!;
                     }
@@ -243,15 +352,12 @@ export class LanguagesMainImpl implements LanguagesMain {
                         // using DefinitionLink because Location is mandatory part of DefinitionLink
                         const definitionLinks: monaco.languages.DefinitionLink[] = [];
                         for (const item of result) {
-                            definitionLinks.push({ ...item, uri: monaco.Uri.revive(item.uri) });
+                            definitionLinks.push(this.asLocationLink(item));
                         }
                         return definitionLinks;
                     } else {
                         // single Location
-                        return <monaco.languages.Location>{
-                            uri: monaco.Uri.revive(result.uri),
-                            range: result.range
-                        };
+                        return this.asLocationLink(result);
                     }
                 });
             }
@@ -276,7 +382,7 @@ export class LanguagesMainImpl implements LanguagesMain {
                 if (!this.matchModel(selector, MonacoModelIdentifier.fromModel(model))) {
                     return undefined!;
                 }
-                return this.proxy.$provideHover(handle, model.uri, position).then(v => v!);
+                return this.proxy.$provideHover(handle, model.uri, this.asPosition(position)).then(v => this.p2m.asHover(v)!);
             }
         };
     }
@@ -299,7 +405,7 @@ export class LanguagesMainImpl implements LanguagesMain {
                 if (!this.matchModel(selector, MonacoModelIdentifier.fromModel(model))) {
                     return undefined!;
                 }
-                return this.proxy.$provideDocumentHighlights(handle, model.uri, position).then(result => {
+                return this.proxy.$provideDocumentHighlights(handle, model.uri, this.asPosition(position)).then(result => {
                     if (!result) {
                         return undefined!;
                     }
@@ -307,11 +413,7 @@ export class LanguagesMainImpl implements LanguagesMain {
                     if (Array.isArray(result)) {
                         const highlights: monaco.languages.DocumentHighlight[] = [];
                         for (const item of result) {
-                            highlights.push(
-                                {
-                                    ...item,
-                                    kind: (item.kind ? item.kind : monaco.languages.DocumentHighlightKind.Text)
-                                });
+                            highlights.push(this.p2m.asDocumentHighlight(item));
                         }
                         return highlights;
                     }
@@ -355,10 +457,10 @@ export class LanguagesMainImpl implements LanguagesMain {
                 if (!this.matchModel(selector, MonacoModelIdentifier.fromModel(model))) {
                     return undefined!;
                 }
-                return this.proxy.$provideDocumentLinks(handle, model.uri).then(v => v!);
+                return this.proxy.$provideDocumentLinks(handle, model.uri).then(v => this.p2m.asDocumentLinks(v!));
             },
             resolveLink: (link: monaco.languages.ILink, token) =>
-                this.proxy.$resolveDocumentLink(handle, link).then(v => v!)
+                this.proxy.$resolveDocumentLink(handle, this.m2p.asDocumentLink(link)).then(v => this.p2m.asDocumentLink(v!))
         };
     }
 
@@ -384,10 +486,10 @@ export class LanguagesMainImpl implements LanguagesMain {
     protected createCodeLensProvider(handle: number, selector: LanguageSelector | undefined): monaco.languages.CodeLensProvider {
         return {
             provideCodeLenses: (model, token) =>
-                this.proxy.$provideCodeLenses(handle, model.uri).then(v => v!)
+                this.proxy.$provideCodeLenses(handle, model.uri).then(v => this.p2m.asCodeLenses(v!))
             ,
             resolveCodeLens: (model, codeLens, token) =>
-                this.proxy.$resolveCodeLens(handle, model.uri, codeLens).then(v => v!)
+                this.proxy.$resolveCodeLens(handle, model.uri, this.m2p.asCodeLens(codeLens)).then(v => this.p2m.asCodeLens(v!))
         };
     }
 
@@ -415,7 +517,7 @@ export class LanguagesMainImpl implements LanguagesMain {
     protected createDocumentSymbolProvider(handle: number, selector: LanguageSelector | undefined): monaco.languages.DocumentSymbolProvider {
         return {
             provideDocumentSymbols: (model, token) =>
-                this.proxy.$provideDocumentSymbols(handle, model.uri).then(v => v!)
+                this.proxy.$provideDocumentSymbols(handle, model.uri).then(v => this.p2m.asDocumentSymbols(v!))
         };
     }
 
@@ -425,7 +527,7 @@ export class LanguagesMainImpl implements LanguagesMain {
                 if (!this.matchModel(selector, MonacoModelIdentifier.fromModel(model))) {
                     return undefined!;
                 }
-                return this.proxy.$provideDefinition(handle, model.uri, position).then(result => {
+                return this.proxy.$provideDefinition(handle, model.uri, this.asPosition(position)).then(result => {
                     if (!result) {
                         return undefined!;
                     }
@@ -434,15 +536,12 @@ export class LanguagesMainImpl implements LanguagesMain {
                         // using DefinitionLink because Location is mandatory part of DefinitionLink
                         const definitionLinks: monaco.languages.DefinitionLink[] = [];
                         for (const item of result) {
-                            definitionLinks.push({ ...item, uri: monaco.Uri.revive(item.uri) });
+                            definitionLinks.push(this.asLocationLink(item));
                         }
                         return definitionLinks;
                     } else {
                         // single Location
-                        return <monaco.languages.Location>{
-                            uri: monaco.Uri.revive(result.uri),
-                            range: result.range
-                        };
+                        return this.asLocationLink(result);
                     }
                 });
             }
@@ -456,7 +555,7 @@ export class LanguagesMainImpl implements LanguagesMain {
                 if (!this.matchModel(selector, MonacoModelIdentifier.fromModel(model))) {
                     return undefined!;
                 }
-                return this.proxy.$provideSignatureHelp(handle, model.uri, position).then(v => v!);
+                return this.proxy.$provideSignatureHelp(handle, model.uri, this.asPosition(position)).then(v => this.p2m.asSignatureHelp(v!));
             }
         };
     }
@@ -479,7 +578,7 @@ export class LanguagesMainImpl implements LanguagesMain {
                 if (!this.matchModel(selector, MonacoModelIdentifier.fromModel(model))) {
                     return undefined!;
                 }
-                return this.proxy.$provideDocumentFormattingEdits(handle, model.uri, options).then(v => v!);
+                return this.proxy.$provideDocumentFormattingEdits(handle, model.uri, options).then(v => this.p2m.asTextEdits(v!));
             }
         };
     }
@@ -498,11 +597,11 @@ export class LanguagesMainImpl implements LanguagesMain {
 
     createRangeFormattingProvider(handle: number, selector: LanguageSelector | undefined): monaco.languages.DocumentRangeFormattingEditProvider {
         return {
-            provideDocumentRangeFormattingEdits: (model, range: Range, options, token) => {
+            provideDocumentRangeFormattingEdits: (model, range, options, token) => {
                 if (!this.matchModel(selector, MonacoModelIdentifier.fromModel(model))) {
                     return undefined!;
                 }
-                return this.proxy.$provideDocumentRangeFormattingEdits(handle, model.uri, range, options).then(v => v!);
+                return this.proxy.$provideDocumentRangeFormattingEdits(handle, model.uri, this.m2p.asRange(range), options).then(v => this.p2m.asTextEdits(v!));
             }
         };
     }
@@ -530,7 +629,7 @@ export class LanguagesMainImpl implements LanguagesMain {
                 if (!this.matchModel(selector, MonacoModelIdentifier.fromModel(model))) {
                     return undefined!;
                 }
-                return this.proxy.$provideOnTypeFormattingEdits(handle, model.uri, position, ch, options).then(v => v!);
+                return this.proxy.$provideOnTypeFormattingEdits(handle, model.uri, this.asPosition(position), ch, options).then(v => this.p2m.asTextEdits(v!));
             }
         };
     }
@@ -553,7 +652,7 @@ export class LanguagesMainImpl implements LanguagesMain {
                 if (!this.matchModel(selector, MonacoModelIdentifier.fromModel(model))) {
                     return undefined!;
                 }
-                return this.proxy.$provideFoldingRange(handle, model.uri, context).then(v => v!);
+                return this.proxy.$provideFoldingRange(handle, model.uri).then(v => this.p2m.asFoldingRanges(v!));
             }
         };
     }
@@ -577,32 +676,11 @@ export class LanguagesMainImpl implements LanguagesMain {
                     return undefined!;
                 }
                 return this.proxy.$provideDocumentColors(handle, model.uri).then(documentColors =>
-                    documentColors.map(documentColor => {
-                        const [red, green, blue, alpha] = documentColor.color;
-                        const color = {
-                            red: red,
-                            green: green,
-                            blue: blue,
-                            alpha: alpha
-                        };
-
-                        return {
-                            color,
-                            range: documentColor.range
-                        };
-                    })
+                    this.p2m.asColorInformations(documentColors)
                 );
             },
             provideColorPresentations: (model, colorInfo, token) =>
-                this.proxy.$provideColorPresentations(handle, model.uri, {
-                    color: [
-                        colorInfo.color.red,
-                        colorInfo.color.green,
-                        colorInfo.color.blue,
-                        colorInfo.color.alpha
-                    ],
-                    range: colorInfo.range
-                })
+                this.proxy.$provideColorPresentations(handle, model.uri, this.asColorInformation(colorInfo)).then(v => this.p2m.asColorPresentations(v!))
         };
     }
 
@@ -620,11 +698,12 @@ export class LanguagesMainImpl implements LanguagesMain {
 
     protected createQuickFixProvider(handle: number, selector: LanguageSelector | undefined, providedCodeActionKinds?: string[]): monaco.languages.CodeActionProvider {
         return {
-            provideCodeActions: (model, rangeOrSelection, monacoContext) => {
+            provideCodeActions: (model, range, monacoContext) => {
                 if (!this.matchModel(selector, MonacoModelIdentifier.fromModel(model))) {
                     return undefined!;
                 }
-                return this.proxy.$provideCodeActions(handle, model.uri, rangeOrSelection, monacoContext);
+                return this.proxy.$provideCodeActions(handle, model.uri, this.m2p.asRange(range), this.m2p.asCodeActionContext(monacoContext))
+                    .then(v => this.p2m.asCodeActions(v));
             }
         };
     }
@@ -647,15 +726,15 @@ export class LanguagesMainImpl implements LanguagesMain {
                 if (!this.matchModel(selector, MonacoModelIdentifier.fromModel(model))) {
                     return undefined!;
                 }
-                return this.proxy.$provideRenameEdits(handle, model.uri, position, newName)
-                    .then(v => reviveWorkspaceEditDto(v!));
+                return this.proxy.$provideRenameEdits(handle, model.uri, this.m2p.asPosition(position.lineNumber, position.column), newName)
+                    .then(v => this.p2m.asWorkspaceEdit(v!));
             },
             resolveRenameLocation: supportsResolveLocation
                 ? (model, position, token) => {
                     if (!this.matchModel(selector, MonacoModelIdentifier.fromModel(model))) {
                         return undefined!;
                     }
-                    return this.proxy.$resolveRenameLocation(handle, model.uri, position).then(v => v!);
+                    return this.proxy.$resolveRenameLocation(handle, model.uri, this.asPosition(position)).then(v => this.asRenameLocation(v!));
                 }
                 : undefined
         };
@@ -693,56 +772,6 @@ export class LanguagesMainImpl implements LanguagesMain {
     }
 }
 
-function reviveMarker(marker: MarkerData): vst.Diagnostic {
-    const monacoMarker: vst.Diagnostic = {
-        code: marker.code,
-        severity: reviveSeverity(marker.severity),
-        range: reviveRange(marker.startLineNumber, marker.startColumn, marker.endLineNumber, marker.endColumn),
-        message: marker.message,
-        source: marker.source,
-        relatedInformation: undefined
-    };
-
-    if (marker.relatedInformation) {
-        monacoMarker.relatedInformation = marker.relatedInformation.map(reviveRelated);
-    }
-
-    return monacoMarker;
-}
-
-function reviveSeverity(severity: MarkerSeverity): vst.DiagnosticSeverity {
-    switch (severity) {
-        case MarkerSeverity.Error: return vst.DiagnosticSeverity.Error;
-        case MarkerSeverity.Warning: return vst.DiagnosticSeverity.Warning;
-        case MarkerSeverity.Info: return vst.DiagnosticSeverity.Information;
-        case MarkerSeverity.Hint: return vst.DiagnosticSeverity.Hint;
-    }
-}
-
-function reviveRange(startLine: number, startColumn: number, endLine: number, endColumn: number): vst.Range {
-    // note: language server range is 0-based, marker is 1-based, so need to deduct 1 here
-    return {
-        start: {
-            line: startLine - 1,
-            character: startColumn - 1
-        },
-        end: {
-            line: endLine - 1,
-            character: endColumn - 1
-        }
-    };
-}
-
-function reviveRelated(related: RelatedInformation): vst.DiagnosticRelatedInformation {
-    return {
-        message: related.message,
-        location: {
-            uri: related.resource,
-            range: reviveRange(related.startLineNumber, related.startColumn, related.endLineNumber, related.endColumn)
-        }
-    };
-}
-
 function reviveRegExp(regExp?: SerializedRegExp): RegExp | undefined {
     if (typeof regExp === 'undefined' || regExp === null) {
         return undefined;
@@ -775,18 +804,4 @@ function reviveOnEnterRules(onEnterRules?: SerializedOnEnterRule[]): monaco.lang
         return undefined;
     }
     return onEnterRules.map(reviveOnEnterRule);
-}
-
-export function reviveWorkspaceEditDto(data: WorkspaceEditDto): monaco.languages.WorkspaceEdit {
-    if (data && data.edits) {
-        for (const edit of data.edits) {
-            if (typeof (<ResourceTextEditDto>edit).resource === 'object') {
-                (<ResourceTextEditDto>edit).resource = URI.revive((<ResourceTextEditDto>edit).resource);
-            } else {
-                (<ResourceFileEditDto>edit).newUri = URI.revive((<ResourceFileEditDto>edit).newUri);
-                (<ResourceFileEditDto>edit).oldUri = URI.revive((<ResourceFileEditDto>edit).oldUri);
-            }
-        }
-    }
-    return <monaco.languages.WorkspaceEdit>data;
 }

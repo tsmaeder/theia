@@ -17,11 +17,10 @@
 
 import URI from 'vscode-uri/lib/umd';
 import * as theia from '@theia/plugin';
+import * as lsp from 'vscode-languageserver-types';
 import { DocumentsExtImpl } from '../documents';
-import { Hover } from '../../api/model';
 import * as Converter from '../type-converters';
 import { Range } from '../types-impl';
-import { Position } from '../../api/plugin-api';
 import { createToken } from '../token-provider';
 
 export class HoverAdapter {
@@ -31,7 +30,7 @@ export class HoverAdapter {
         private readonly documents: DocumentsExtImpl
     ) { }
 
-    public provideHover(resource: URI, position: Position): Promise<Hover | undefined> {
+    public provideHover(resource: URI, position: lsp.Position): Promise<lsp.Hover | undefined> {
         const document = this.documents.getDocumentData(resource);
         if (!document) {
             return Promise.reject(new Error(`There are no document for ${resource}`));
