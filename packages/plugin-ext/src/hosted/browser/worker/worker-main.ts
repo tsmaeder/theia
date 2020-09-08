@@ -140,6 +140,7 @@ const pluginManager = new PluginManagerExtImpl({
 const apiFactory = createAPIFactory(
     rpc,
     pluginManager,
+    undefined,
     envExt,
     debugExt,
     preferenceRegistryExt,

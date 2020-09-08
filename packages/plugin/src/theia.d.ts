@@ -4866,8 +4866,9 @@ declare module '@theia/plugin' {
 		 *
 		 * @param uri The uri of the file.
 		 * @param content The new content of the file.
+         * @param options Defines if missing files should or must be created.
 		 */
-        writeFile(uri: Uri, content: Uint8Array): Thenable<void>;
+        writeFile(uri: Uri, content: Uint8Array, options: { create: boolean, overwrite: boolean }): Thenable<void>;
 
 		/**
 		 * Delete a file.

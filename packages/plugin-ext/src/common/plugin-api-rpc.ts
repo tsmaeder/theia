@@ -1368,6 +1368,8 @@ export interface DebugMain {
     $customRequest(sessionId: string, command: string, args?: any): Promise<DebugProtocol.Response>;
 }
 
+export const PLUGIN_FILE_SYSTEM_HANDLE = 0;
+
 export interface FileSystemExt {
     $stat(handle: number, resource: UriComponents): Promise<files.Stat>;
     $readdir(handle: number, resource: UriComponents): Promise<[string, files.FileType][]>;

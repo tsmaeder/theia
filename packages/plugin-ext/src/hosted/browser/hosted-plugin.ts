@@ -153,7 +153,7 @@ export class HostedPluginSupport {
 
     private theiaReadyPromise: Promise<any>;
 
-    protected readonly managers = new Map<string, PluginManagerExt>();
+    protected readonly protocols = new Map<string, RPCProtocol>();
 
     private readonly contributions = new Map<string, PluginContributions>();
 
@@ -427,15 +427,20 @@ export class HostedPluginSupport {
     }
 
     protected async obtainManager(host: string, hostContributions: PluginContributions[], toDisconnect: DisposableCollection): Promise<PluginManagerExt | undefined> {
-        let manager = this.managers.get(host);
-        if (!manager) {
+        const protocol = await this.obtainProtocol(host, hostContributions, toDisconnect);
+        return protocol?.getProxy(MAIN_RPC_CONTEXT.HOSTED_PLUGIN_MANAGER_EXT);
+    }
+
+    protected async obtainProtocol(host: string, hostContributions: PluginContributions[], toDisconnect: DisposableCollection): Promise<RPCProtocol | undefined> {
+        const protocol = this.protocols.get(host);
+        if (!protocol) {
             const pluginId = getPluginId(hostContributions[0].plugin.metadata.model);
             const rpc = this.initRpc(host, pluginId);
+            this.protocols.set(host, rpc);
+            toDisconnect.push(Disposable.create(() => this.protocols.delete(host)));
             toDisconnect.push(rpc);
 
-            manager = rpc.getProxy(MAIN_RPC_CONTEXT.HOSTED_PLUGIN_MANAGER_EXT);
-            this.managers.set(host, manager);
-            toDisconnect.push(Disposable.create(() => this.managers.delete(host)));
+            const manager = rpc.getProxy(MAIN_RPC_CONTEXT.HOSTED_PLUGIN_MANAGER_EXT);
 
             const [extApi, globalState, workspaceState, webviewResourceRoot, webviewCspSource, defaultShell, jsonValidation] = await Promise.all([
                 this.server.getExtPluginAPI(),
@@ -475,7 +480,11 @@ export class HostedPluginSupport {
                 return undefined;
             }
         }
-        return manager;
+        return protocol;
+    }
+
+    protected getManagers(): PluginManagerExt[] {
+        return Array.from(this.protocols.values(), rpc => rpc.getProxy(MAIN_RPC_CONTEXT.HOSTED_PLUGIN_MANAGER_EXT));
     }
 
     protected initRpc(host: PluginHost, pluginId: string): RPCProtocol {
@@ -499,7 +508,7 @@ export class HostedPluginSupport {
 
     private async updateStoragePath(): Promise<void> {
         const path = await this.getStoragePath();
-        for (const manager of this.managers.values()) {
+        for (const manager of this.getManagers()) {
             manager.$updateStoragePath(path);
         }
     }
@@ -530,7 +539,7 @@ export class HostedPluginSupport {
         }
         this.activationEvents.add(activationEvent);
         const activation: Promise<void>[] = [];
-        for (const manager of this.managers.values()) {
+        for (const manager of this.getManagers()) {
             activation.push(manager.$activateByEvent(activationEvent));
         }
         await Promise.all(activation);
@@ -656,7 +665,7 @@ export class HostedPluginSupport {
 
     async activatePlugin(id: string): Promise<void> {
         const activation = [];
-        for (const manager of this.managers.values()) {
+        for (const manager of this.getManagers()) {
             activation.push(manager.$activatePlugin(id));
         }
         await Promise.all(activation);

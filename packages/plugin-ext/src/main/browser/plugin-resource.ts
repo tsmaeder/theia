@@ -17,7 +17,7 @@
 import { Resource, ResourceReadOptions, ResourceResolver, MaybePromise } from '@theia/core/lib/common';
 import { Endpoint } from '@theia/core/lib/browser';
 import URI from '@theia/core/lib/common/uri';
-import { PluginPackage } from '../../common';
+import { PluginUri } from '../../common';
 import { injectable } from 'inversify';
 
 export class PluginResource implements Resource {
@@ -60,7 +60,7 @@ export class PluginResource implements Resource {
 @injectable()
 export class PluginResourceResolver implements ResourceResolver {
     resolve(uri: URI): MaybePromise<Resource> {
-        if (uri.scheme !== PluginPackage.RESOURCE_SCHEME) {
+        if (uri.scheme !== PluginUri.SCHEME) {
             throw new Error('Not a plugin resource');
         }
         const pathAsString = uri.path.toString();

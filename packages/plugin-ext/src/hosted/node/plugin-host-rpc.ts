@@ -30,6 +30,7 @@ import { ClipboardExt } from '../../plugin/clipboard-ext';
 import { loadManifest } from './plugin-manifest-loader';
 import { KeyValueStorageProxy } from '../../plugin/plugin-storage';
 import { WebviewsExtImpl } from '../../plugin/webviews';
+import { FileSystemProvider } from '@theia/filesystem/lib/common/files';
 
 /**
  * Handle the RPC calls.
@@ -41,7 +42,7 @@ export class PluginHostRPC {
     private pluginManager: PluginManagerExtImpl;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    constructor(protected readonly rpc: any) {
+    constructor(protected readonly rpc: any, protected readonly localFileSystem: FileSystemProvider) {
     }
 
     initialize(): void {
@@ -65,6 +66,7 @@ export class PluginHostRPC {
         this.apiFactory = createAPIFactory(
             this.rpc,
             this.pluginManager,
+            this.localFileSystem,
             envExt,
             debugExt,
             preferenceRegistryExt,

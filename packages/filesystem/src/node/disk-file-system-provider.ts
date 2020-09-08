@@ -100,10 +100,10 @@ export class DiskFileSystemProvider implements Disposable,
     );
 
     @inject(FileSystemWatcherServer)
-    protected readonly watcher: FileSystemWatcherServer;
+    protected watcher: FileSystemWatcherServer;
 
     @inject(EncodingService)
-    protected readonly encodingService: EncodingService;
+    protected encodingService: EncodingService;
 
     @postConstruct()
     protected init(): void {

@@ -17,6 +17,9 @@
 import { Emitter } from '@theia/core/lib/common/event';
 import { RPCProtocolImpl, MessageType, ConnectionClosedError } from '../../common/rpc-protocol';
 import { PluginHostRPC } from './plugin-host-rpc';
+import { DiskFileSystemProvider } from '@theia/filesystem/lib/node/disk-file-system-provider';
+import { EncodingService } from '@theia/core/src/common/encoding-service';
+import { NsfwFileSystemWatcherServer } from '@theia/filesystem/lib/node/nsfw-watcher/nsfw-filesystem-watcher';
 console.log('PLUGIN_HOST(' + process.pid + ') starting instance');
 
 // override exit() function, to do not allow plugin kill this node
@@ -111,5 +114,15 @@ process.on('message', async (message: string) => {
     }
 });
 
-const pluginHostRPC = new PluginHostRPC(rpc);
+class LocalDiskFileSystem extends DiskFileSystemProvider {
+    constructor() {
+        super();
+        this.encodingService = new EncodingService();
+        this.watcher = new NsfwFileSystemWatcherServer();
+    }
+}
+
+const localFileSystem = new LocalDiskFileSystem();
+
+const pluginHostRPC = new PluginHostRPC(rpc, localFileSystem);
 pluginHostRPC.initialize();

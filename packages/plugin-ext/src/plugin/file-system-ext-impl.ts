@@ -30,7 +30,7 @@
 
 import { URI, UriComponents } from 'vscode-uri';
 import { RPCProtocol } from '../common/rpc-protocol';
-import { PLUGIN_RPC_CONTEXT, FileSystemExt, FileSystemMain, IFileChangeDto } from '../common/plugin-api-rpc';
+import { PLUGIN_RPC_CONTEXT, FileSystemExt, FileSystemMain, IFileChangeDto, PLUGIN_FILE_SYSTEM_HANDLE, PluginManager } from '../common/plugin-api-rpc';
 import * as vscode from '@theia/plugin';
 import * as files from '@theia/filesystem/lib/common/files';
 import { FileChangeType, FileSystemError } from './types-impl';
@@ -41,6 +41,12 @@ import { State, StateMachine, LinkComputer, Edge } from '../common/link-computer
 import { commonPrefixLength } from '@theia/core/lib/common/strings';
 import { CharCode } from '@theia/core/lib/common/char-code';
 import { BinaryBuffer } from '@theia/core/lib/common/buffer';
+import { PluginUri, getPluginId } from '../common';
+import { FileSystemProvider } from '@theia/filesystem/lib/common/files';
+import CoreURI from '@theia/core/lib/common/uri';
+import { DelegatingFileSystemProvider } from '@theia/filesystem/lib/common/delegating-file-system-provider';
+import * as path from 'path';
+import { Path } from '@theia/core/src/common';
 
 type IDisposable = vscode.Disposable;
 
@@ -135,6 +141,109 @@ class FsLinkProvider {
     }
 }
 
+class PluginFileSystem implements vscode.FileSystemProvider {
+    private localProvider: FileSystemProvider;
+
+    constructor(localProvider: FileSystemProvider) {
+        this.localProvider = localProvider;
+        this.onDidChangeFile = (l, thisArgument, disposables) => {
+            return this.localProvider.onDidChangeFile(event => {
+                const mapped: vscode.FileChangeEvent[] = [];
+                for (const e of event) {
+                    const { resource, type } = e;
+                    let newType: vscode.FileChangeType | undefined;
+                    switch (type) {
+                        case files.FileChangeType.UPDATED:
+                            newType = vscode.FileChangeType.Changed;
+                            break;
+                        case files.FileChangeType.ADDED:
+                            newType = vscode.FileChangeType.Created;
+                            break;
+                        case files.FileChangeType.DELETED:
+                            newType = vscode.FileChangeType.Deleted;
+                            break;
+                        default:
+                            throw new Error('Unknown FileChangeType');
+                    }
+                    mapped.push({ uri: URI.parse(resource.toString()), type: newType });
+                }
+            }, thisArgument, disposables);
+        };
+    }
+
+    onDidChangeFile: vscode.Event<vscode.FileChangeEvent[]>;
+
+    watch(uri: vscode.Uri, options: { recursive: boolean; excludes: string[]; }): vscode.Disposable {
+        return this.localProvider.watch(new CoreURI(uri), options);
+    }
+    stat(uri: vscode.Uri): vscode.FileStat | Promise<vscode.FileStat> {
+        return this.localProvider.stat(new CoreURI(uri));
+    }
+    readDirectory(uri: vscode.Uri): [string, vscode.FileType][] | Promise<[string, vscode.FileType][]> {
+        return this.localProvider.readdir(new CoreURI(uri));
+    }
+    createDirectory(uri: vscode.Uri): void | Promise<void> {
+        return this.localProvider.mkdir(new CoreURI(uri));
+    }
+    readFile(uri: vscode.Uri): Uint8Array | Promise<Uint8Array> {
+        return this.localProvider.readFile!(new CoreURI(uri));
+    }
+    writeFile(uri: vscode.Uri, content: Uint8Array, options: { create: boolean; overwrite: boolean; }): void | Promise<void> {
+        return this.localProvider.writeFile!(new CoreURI(uri), content, options);
+    }
+    delete(uri: vscode.Uri, options: { recursive: boolean; }): void | Promise<void> {
+        return this.localProvider.delete(new CoreURI(uri), { recursive: options.recursive, useTrash: true });
+
+    }
+    rename(oldUri: vscode.Uri, newUri: vscode.Uri, options: { overwrite: boolean; }): void | Promise<void> {
+        return this.localProvider.rename(new CoreURI(oldUri), new CoreURI(newUri), options);
+    }
+}
+
+class PluginUriConverter implements DelegatingFileSystemProvider.URIConverter {
+    constructor(protected readonly pluginManager: PluginManager) {
+
+    }
+
+    to(resource: CoreURI): CoreURI | undefined {
+        if (resource.scheme === PluginUri.SCHEME) {
+            const pathAsString = resource.path.toString();
+            const matches = new RegExp('/hostedPlugin/(.*)/(.*)').exec(pathAsString);
+            if (!matches) {
+                throw new Error('path does not match: ' + resource.path.toString());
+            }
+            const pluginId = matches[1];
+            const relativePath = matches[2];
+            const plugin = this.pluginManager.getPluginById(pluginId);
+            if (!plugin) {
+                throw new Error('plugin not found for id' + pluginId);
+            }
+            return new CoreURI().withScheme('file').withPath(path.join(plugin.pluginFolder, relativePath));
+        }
+        return resource;
+    }
+
+    from(resource: CoreURI): CoreURI | undefined {
+        if (resource.scheme === 'file') {
+            let relativePath;
+            let pluginId;
+            this.pluginManager.getAllPlugins().find(plugin => {
+                const pluginFolder = new Path(plugin.pluginFolder);
+                relativePath = pluginFolder.relative(resource.path);
+                if (relativePath) {
+                    pluginId = getPluginId(plugin.model);
+                    return true;
+                }
+                return false;
+            });
+            if (!relativePath) {
+                throw new Error('URI not relative to any plugin: ' + resource.toString());
+            }
+            return new CoreURI().withScheme(PluginUri.SCHEME).withPath(`/hostedPlugin/${pluginId}/${relativePath}`);
+        }
+    }
+}
+
 class ConsumerFileSystem implements vscode.FileSystem {
 
     constructor(private _proxy: FileSystemMain) { }
@@ -197,16 +306,23 @@ export class FileSystemExtImpl implements FileSystemExt {
     private readonly _watches = new Map<number, IDisposable>();
 
     private _linkProviderRegistration?: IDisposable;
-    private _handlePool: number = 0;
+    private _handlePool: number = PLUGIN_FILE_SYSTEM_HANDLE + 1;
 
     readonly fileSystem: vscode.FileSystem;
 
-    constructor(rpc: RPCProtocol, private _extHostLanguageFeatures: LanguagesExtImpl) {
+    constructor(rpc: RPCProtocol, private _extHostLanguageFeatures: LanguagesExtImpl, localProvider: FileSystemProvider | undefined, pluginManager: PluginManager) {
         this._proxy = rpc.getProxy(PLUGIN_RPC_CONTEXT.FILE_SYSTEM_MAIN);
         this.fileSystem = new ConsumerFileSystem(this._proxy);
 
         // register used schemes
         Object.keys(Schemas).forEach(scheme => this._usedSchemes.add(scheme));
+        this._linkProvider.add(PluginUri.SCHEME);
+        this._usedSchemes.add(PluginUri.SCHEME);
+
+        if (localProvider) {
+            const delegatingProvider = new DelegatingFileSystemProvider(localProvider, { uriConverter: new PluginUriConverter(pluginManager) });
+            this._fsProvider.set(PLUGIN_FILE_SYSTEM_HANDLE, new PluginFileSystem(delegatingProvider));
+        }
     }
 
     dispose(): void {
