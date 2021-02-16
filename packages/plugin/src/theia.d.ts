@@ -2067,100 +2067,10 @@ declare module '@theia/plugin' {
     }
 
     /**
-     * A light-weight user input UI that is initially not visible. After
-     * configuring it through its properties the extension can make it
-     * visible by calling [QuickInput.show](#QuickInput.show).
-     *
-     * There are several reasons why this UI might have to be hidden and
-     * the extension will be notified through [QuickInput.onDidHide](#QuickInput.onDidHide).
-     * (Examples include: an explicit call to [QuickInput.hide](#QuickInput.hide),
-     * the user pressing Esc, some other input UI opening, etc.)
-     *
-     * A user pressing Enter or some other gesture implying acceptance
-     * of the current state does not automatically hide this UI component.
-     * It is up to the extension to decide whether to accept the user's input
-     * and if the UI should indeed be hidden through a call to [QuickInput.hide](#QuickInput.hide).
-     *
-     * When the extension no longer needs this input UI, it should
-     * [QuickInput.dispose](#QuickInput.dispose) it to allow for freeing up
-     * any resources associated with it.
-     *
-     * See [QuickPick](#QuickPick) and [InputBox](#InputBox) for concrete UIs.
-     */
-    export interface QuickInput {
-
-        /**
-         * An optional title.
-         */
-        title: string | undefined;
-
-        /**
-         * An optional current step count.
-         */
-        step: number | undefined;
-
-        /**
-         * An optional total step count.
-         */
-        totalSteps: number | undefined;
-
-        /**
-         * If the UI should allow for user input. Defaults to true.
-         *
-         * Change this to false, e.g., while validating user input or
-         * loading data for the next step in user input.
-         */
-        enabled: boolean;
-
-        /**
-         * If the UI should show a progress indicator. Defaults to false.
-         *
-         * Change this to true, e.g., while loading more data or validating
-         * user input.
-         */
-        busy: boolean;
-
-        /**
-         * If the UI should stay open even when loosing UI focus. Defaults to false.
-         */
-        ignoreFocusOut: boolean;
-
-        /**
-         * Makes the input UI visible in its current configuration. Any other input
-         * UI will first fire an [QuickInput.onDidHide](#QuickInput.onDidHide) event.
-         */
-        show(): void;
-
-        /**
-         * Hides this input UI. This will also fire an [QuickInput.onDidHide](#QuickInput.onDidHide)
-         * event.
-         */
-        hide(): void;
-
-        /**
-         * An event signaling when this input UI is hidden.
-         *
-         * There are several reasons why this UI might have to be hidden and
-         * the extension will be notified through [QuickInput.onDidHide](#QuickInput.onDidHide).
-         * (Examples include: an explicit call to [QuickInput.hide](#QuickInput.hide),
-         * the user pressing Esc, some other input UI opening, etc.)
-         */
-        onDidHide: Event<void>;
-
-        /**
-         * Dispose of this input UI and any associated resources. If it is still
-         * visible, it is first hidden. After this call the input UI is no longer
-         * functional and no additional methods or properties on it should be
-         * accessed. Instead a new input UI should be created.
-         */
-        dispose(): void;
-    }
-
-    /**
-     * Something that can be selected from a list of items.
+     * Represents an item that can be selected from a list of items.
      */
     export interface QuickPickItem {
-
+        type?: 'item' | 'separator';
         /**
          * The item label
          */
@@ -2181,32 +2091,10 @@ declare module '@theia/plugin' {
          * not implemented yet
          */
         picked?: boolean;
-
         /**
-         * Used to display the group label in the right corner of item
+         * Always show this item.
          */
-        groupLabel?: string;
-
-        /**
-         * Used to display border after item
-         */
-        showBorder?: boolean;
-    }
-
-    /**
-     * Button for an action in a [QuickPick](#QuickPick) or [InputBox](#InputBox).
-     */
-    export interface QuickInputButton {
-
-        /**
-         * Icon for the button.
-         */
-        readonly iconPath: Uri | { light: Uri; dark: Uri } | ThemeIcon;
-
-        /**
-         * An optional tooltip.
-         */
-        readonly tooltip?: string | undefined;
+        alwaysShow?: boolean;
     }
 
     /**
@@ -2390,7 +2278,7 @@ declare module '@theia/plugin' {
          * @return A human readable string which is presented as diagnostic message.
          * Return `undefined`, or the empty string when 'value' is valid.
          */
-        validateInput?(value: string): string | undefined | PromiseLike<string | undefined>;
+        validateInput?: (input: string) => Promise<string | null | undefined> | undefined;
 
         /**
          * An optional function that will be called on Enter key.
@@ -2600,7 +2488,7 @@ declare module '@theia/plugin' {
          */
         static readonly Folder: ThemeIcon;
 
-        private constructor(id: string);
+        private constructor(public id: string);
     }
 
     /**
@@ -3248,39 +3136,6 @@ declare module '@theia/plugin' {
          * the parent directory is guaranteed to be existent.
          */
         readonly logPath: string;
-    }
-
-    /**
-     * A memento represents a storage utility. It can store and retrieve
-     * values.
-     */
-    export interface Memento {
-
-        /**
-         * Return a value.
-         *
-         * @param key A string.
-         * @return The stored value or `undefined`.
-         */
-        get<T>(key: string): T | undefined;
-
-        /**
-         * Return a value.
-         *
-         * @param key A string.
-         * @param defaultValue A value that should be returned when there is no
-         * value (`undefined`) with the given key.
-         * @return The stored value or the defaultValue.
-         */
-        get<T>(key: string, defaultValue: T): T;
-
-        /**
-         * Store a value. The value must be JSON-stringifyable.
-         *
-         * @param key A string.
-         * @param value A value. MUST not contain cyclic references.
-         */
-        update(key: string, value: any): PromiseLike<void>;
     }
 
     /**
@@ -4729,7 +4584,7 @@ declare module '@theia/plugin' {
         /**
          * Icon for the button.
          */
-        readonly iconPath: Uri | { light: Uri; dark: Uri } | ThemeIcon;
+        readonly iconPath: Uri | { light: string | Uri; dark: string | Uri } | monaco.theme.ThemeIcon;
 
         /**
          * An optional tooltip.

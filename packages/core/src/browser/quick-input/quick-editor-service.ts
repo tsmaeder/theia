@@ -1,5 +1,5 @@
 /********************************************************************************
- * Copyright (C) 2017 TypeFox and others.
+ * Copyright (c) 2021 SAP SE or an SAP affiliate company and others.
  *
  * This program and the accompanying materials are made available under the
  * terms of the Eclipse Public License v. 2.0 which is available at
@@ -14,12 +14,20 @@
  * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
  ********************************************************************************/
 
-export * from './quick-open-model';
-export * from './quick-open-action-provider';
-export * from './quick-open-service';
-export * from './quick-pick-service';
-export * from './quick-input-service';
-export * from './quick-command-service';
-export * from './quick-command-contribution';
-export * from './quick-open-frontend-contribution';
-export * from './prefix-quick-open-service';
+import { inject, injectable } from 'inversify';
+import { LabelProvider } from '../label-provider';
+import { OpenerService } from '../opener-service';
+import { QuickAccessContribution } from './quick-access-contribution';
+import { QuickInputService } from './quick-input-service';
+
+@injectable()
+export class QuickEditorService extends QuickInputService implements QuickAccessContribution {
+
+    @inject(OpenerService)
+    protected readonly openerService: OpenerService;
+
+    @inject(LabelProvider)
+    protected readonly labelProvider: LabelProvider;
+
+    registerQuickAccessProvider(): void { }
+}

@@ -22,6 +22,10 @@ export { ContainerModule };
 export default loadVsRequire(window)
     .then(vsRequire => loadMonaco(vsRequire))
     .then(() =>
+        // Clear Monaco QuickAccessRegistry as it currently includes monaco internal providers and not Theia's providers
+        monaco.platform.Registry.as<monaco.quickInput.IQuickAccessRegistry>('workbench.contributions.quickaccess').clear()
+    )
+    .then(() =>
         import('./monaco-frontend-module')
     ).then(module =>
         module.default
