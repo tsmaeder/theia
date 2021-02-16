@@ -14,10 +14,10 @@
  * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
  ********************************************************************************/
 
-import { injectable, inject } from '@theia/core/shared/inversify';
+import { injectable, inject, optional } from '@theia/core/shared/inversify';
 import {
     TreeWidget, TreeProps, ContextMenuRenderer, TreeNode, TreeModel,
-    CompositeTreeNode, NodeProps
+    CompositeTreeNode, NodeProps, QuickViewService
 } from '@theia/core/lib/browser';
 import * as React from '@theia/core/shared/react';
 import { BulkEditInfoNode, BulkEditNode } from './bulk-edit-tree';
@@ -28,7 +28,6 @@ import { EditorWidget, EditorManager, EditorOpenerOptions } from '@theia/editor/
 import { DiffUris } from '@theia/core/lib/browser';
 import { MEMORY_TEXT } from './in-memory-text-resource';
 import { Disposable } from '@theia/core/lib/common/disposable';
-import { QuickViewService } from '@theia/core/lib/browser/quick-view-service';
 
 export const BULK_EDIT_TREE_WIDGET_ID = 'bulkedit';
 export const BULK_EDIT_WIDGET_NAME = 'Refactor Preview';
@@ -43,7 +42,7 @@ export class BulkEditTreeWidget extends TreeWidget {
     @inject(EditorManager)
     protected readonly editorManager: EditorManager;
 
-    @inject(QuickViewService)
+    @inject(QuickViewService) @optional()
     protected readonly quickView: QuickViewService;
 
     constructor(
@@ -66,7 +65,7 @@ export class BulkEditTreeWidget extends TreeWidget {
 
     async initModel(workspaceEdit: monaco.languages.WorkspaceEdit): Promise<void> {
         await this.model.initModel(workspaceEdit, await this.getFileContentsMap(workspaceEdit));
-        this.quickView.showItem(BULK_EDIT_WIDGET_NAME);
+        this.quickView?.showItem(BULK_EDIT_WIDGET_NAME);
     }
 
     protected handleClickEvent(node: TreeNode | undefined, event: React.MouseEvent<HTMLElement>): void {
@@ -225,6 +224,6 @@ export class BulkEditTreeWidget extends TreeWidget {
 
     private disposeEditors(): void {
         this.editorWidgets.forEach(w => w.dispose());
-        this.quickView.hideItem(BULK_EDIT_WIDGET_NAME);
+        this.quickView?.hideItem(BULK_EDIT_WIDGET_NAME);
     }
 }

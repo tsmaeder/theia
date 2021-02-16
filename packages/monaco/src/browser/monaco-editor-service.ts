@@ -49,7 +49,7 @@ export class MonacoEditorService extends monaco.services.CodeEditorServiceImpl {
     protected readonly preferencesService: PreferenceService;
 
     constructor() {
-        super(monaco.services.StaticServices.standaloneThemeService.get());
+        super(undefined, monaco.services.StaticServices.standaloneThemeService.get());
     }
 
     /**

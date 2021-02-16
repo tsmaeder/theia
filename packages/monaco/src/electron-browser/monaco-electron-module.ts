@@ -47,5 +47,9 @@ export default loadVsRequire(global)
         s.process.browser = true;
         return loadMonaco(vsRequire);
     })
+    .then(() =>
+        // Clear Monaco QuickAccessRegistry as it currently includes monaco internal providers and not Theia's providers
+        monaco.platform.Registry.as<monaco.quickInput.IQuickAccessRegistry>('workbench.contributions.quickaccess').clear()
+    )
     .then(() => import('../browser/monaco-frontend-module'))
     .then(module => module.default);

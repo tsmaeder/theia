@@ -56,8 +56,13 @@ export function loadMonaco(vsRequire: any): Promise<void> {
                 'vs/editor/standalone/browser/simpleServices',
                 'vs/editor/standalone/browser/standaloneServices',
                 'vs/editor/standalone/browser/standaloneLanguages',
-                'vs/base/parts/quickopen/browser/quickOpenWidget',
-                'vs/base/parts/quickopen/browser/quickOpenModel',
+                'vs/base/parts/quickinput/browser/quickInput',
+                'vs/platform/quickinput/browser/quickInput',
+                'vs/platform/quickinput/common/quickAccess',
+                'vs/platform/quickinput/browser/quickAccess',
+                'vs/platform/quickinput/browser/pickerQuickAccess',
+                'vs/base/browser/ui/list/listWidget',
+                'vs/platform/registry/common/platform',
                 'vs/base/common/filters',
                 'vs/platform/theme/common/themeService',
                 'vs/platform/theme/common/styler',
@@ -86,7 +91,9 @@ export function loadMonaco(vsRequire: any): Promise<void> {
             ], (commands: any, actions: any,
                 keybindingsRegistry: any, keybindingResolver: any, resolvedKeybinding: any, keybindingLabels: any,
                 keyCodes: any, mime: any, editorExtensions: any, simpleServices: any,
-                standaloneServices: any, standaloneLanguages: any, quickOpenWidget: any, quickOpenModel: any,
+                standaloneServices: any, standaloneLanguages: any, quickInput: any, quickInputPlatform: any,
+                quickAccess: any, quickAccessBrowser: any, pickerQuickAccess: any, listWidget: any, // helpQuickAccess: any, commandsQuickAccess: any,
+                platformRegistry: any,
                 filters: any, themeService: any, styler: any, colorRegistry: any, color: any,
                 platform: any, modes: any, suggest: any, snippetParser: any,
                 format: any,
@@ -105,11 +112,12 @@ export function loadMonaco(vsRequire: any): Promise<void> {
                 global.monaco.services = Object.assign({}, simpleServices, standaloneServices,
                     standaloneLanguages, configuration, configurationModels,
                     resolverService, codeEditorService, codeEditorServiceImpl, markerService, openerService);
-                global.monaco.quickOpen = Object.assign({}, quickOpenWidget, quickOpenModel);
+                global.monaco.quickInput = Object.assign({}, quickInput, quickAccess, quickAccessBrowser, quickInputPlatform,
+                    pickerQuickAccess);
                 global.monaco.filters = filters;
                 global.monaco.theme = Object.assign({}, themeService, styler);
                 global.monaco.color = Object.assign({}, colorRegistry, color);
-                global.monaco.platform = platform;
+                global.monaco.platform = Object.assign({}, platform, platformRegistry);
                 global.monaco.editorExtensions = editorExtensions;
                 global.monaco.modes = modes;
                 global.monaco.suggest = suggest;
@@ -124,6 +132,7 @@ export function loadMonaco(vsRequire: any): Promise<void> {
                 global.monaco.textModel = textModel;
                 global.monaco.strings = strings;
                 global.monaco.async = async;
+                global.monaco.list = listWidget;
                 resolve();
             });
         });
