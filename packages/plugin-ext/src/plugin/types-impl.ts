@@ -1842,7 +1842,6 @@ export class Task {
             value = undefined;
         }
         this.taskExecution = value;
-        this.updateDefinitionBasedOnExecution();
     }
 
     get problemMatchers(): string[] {
@@ -1906,31 +1905,6 @@ export class Task {
             value = Object.create(null);
         }
         this.taskPresentationOptions = value;
-    }
-
-    private updateDefinitionBasedOnExecution(): void {
-        if (this.taskExecution instanceof ProcessExecution) {
-            Object.assign(this.taskDefinition, {
-                id: this.taskExecution.computeId(),
-                taskType: 'process'
-            });
-        } else if (this.taskExecution instanceof ShellExecution) {
-            Object.assign(this.taskDefinition, {
-                id: this.taskExecution.computeId(),
-                taskType: 'shell'
-            });
-        } else if (this.taskExecution instanceof CustomExecution) {
-            Object.assign(this.taskDefinition, {
-                id: this.taskDefinition.id ? this.taskDefinition.id : this.taskExecution.computeId(),
-                taskType: 'customExecution'
-            });
-        } else {
-            Object.assign(this.taskDefinition, {
-                type: '$empty',
-                id: UUID.uuid4(),
-                taskType: this.taskDefinition!.type
-            });
-        }
     }
 }
 

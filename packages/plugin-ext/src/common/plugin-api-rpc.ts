@@ -1363,6 +1363,7 @@ export interface TaskDto {
     group?: string;
     detail?: string;
     presentation?: TaskPresentationOptionsDTO;
+    execution?: ProcessExecutionDTO | ShellExecutionDTO | CustomExecutionDTO;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     [key: string]: any;
 }
@@ -1373,6 +1374,57 @@ export interface TaskPresentationOptionsDTO {
     echo?: boolean;
     panel?: number;
     showReuseMessage?: boolean;
+}
+
+export enum ShellQuotingDTO {
+    Escape = 1,
+    Strong = 2,
+    Weak = 3
+}
+export interface ShellQuotedStringDTO {
+    value: string;
+    quoting: ShellQuotingDTO;
+}
+
+export interface ShellQuotingOptionsDTO {
+
+    escape?: string | {
+        escapeChar: string;
+        charsToEscape: string;
+    };
+    strong?: string;
+    weak?: string;
+}
+
+export interface ShellExecutionOptionsDTO {
+    executable?: string;
+    shellArgs?: string[];
+
+    shellQuoting?: ShellQuotingOptionsDTO;
+    cwd?: string;
+    env?: { [key: string]: string };
+}
+
+export interface ShellExecutionDTO {
+    commandLine?: string;
+    options?: ShellExecutionOptionsDTO;
+    command?: string | ShellQuotedStringDTO;
+    args?: (string | ShellQuotedStringDTO)[];
+}
+
+export interface CustomExecutionDTO {
+    callback: string; // callback id
+}
+
+export interface ProcessExecutionOptionsDTO {
+    cwd?: string;
+    env?: { [key: string]: string };
+}
+
+export class ProcessExecutionDTO {
+    process: string;
+    args: string[];
+    options?: ProcessExecutionOptionsDTO;
 }
 
 export interface TaskExecutionDto {

@@ -177,7 +177,7 @@ export class TasksExtImpl implements TasksExt {
             return adapter.provideTasks(token).then(tasks => {
                 if (tasks) {
                     for (const task of tasks) {
-                        if (task.type === 'customExecution' || task.taskType === 'customExecution') {
+                        if (task.type === 'customExecution') {
                             this.addCustomExecution(task, true);
                         }
                     }

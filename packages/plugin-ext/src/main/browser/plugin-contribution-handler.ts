@@ -302,7 +302,7 @@ export class PluginContributionHandler {
 
         if (contributions.taskDefinitions) {
             for (const taskDefinition of contributions.taskDefinitions) {
-                pushContribution(`taskDefinitions.${taskDefinition.taskType}`,
+                pushContribution(`taskDefinitions.${taskDefinition.type}`,
                     () => this.taskDefinitionRegistry.register(taskDefinition)
                 );
             }

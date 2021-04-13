@@ -66,7 +66,7 @@ export class TaskDefinitionRegistry {
      * @return the task definition for the task configuration. If the task definition is not found, `undefined` is returned.
      */
     getDefinition(taskConfiguration: TaskConfiguration | TaskCustomization): TaskDefinition | undefined {
-        const definitions = this.getDefinitions(taskConfiguration.taskType || taskConfiguration.type);
+        const definitions = this.getDefinitions(taskConfiguration.type);
         let matchedDefinition: TaskDefinition | undefined;
         let highest = -1;
         for (const def of definitions) {
@@ -92,7 +92,7 @@ export class TaskDefinitionRegistry {
      * @param definition the task definition to be added.
      */
     register(definition: TaskDefinition): Disposable {
-        const taskType = definition.taskType;
+        const taskType = definition.type;
         const definitions = this.definitions.get(taskType) || [];
         definitions.push(definition);
         this.definitions.set(taskType, definitions);
@@ -107,9 +107,7 @@ export class TaskDefinitionRegistry {
     }
 
     compareTasks(one: TaskConfiguration | TaskCustomization, other: TaskConfiguration | TaskCustomization): boolean {
-        const oneType = one.taskType || one.type;
-        const otherType = other.taskType || other.type;
-        if (oneType !== otherType) {
+        if (one.type !== other.type) {
             return false;
         }
         const def = this.getDefinition(one);

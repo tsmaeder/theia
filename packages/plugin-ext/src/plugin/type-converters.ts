@@ -750,15 +750,15 @@ export function fromTask(task: theia.Task): TaskDto | undefined {
         return taskDto;
     }
 
-    if (taskDefinition.taskType === 'shell' || types.ShellExecution.is(execution)) {
+    if (types.ShellExecution.is(execution)) {
         return fromShellExecution(<theia.ShellExecution>execution, taskDto);
     }
 
-    if (taskDefinition.taskType === 'process' || types.ProcessExecution.is(execution)) {
+    if (types.ProcessExecution.is(execution)) {
         return fromProcessExecution(<theia.ProcessExecution>execution, taskDto);
     }
 
-    if (taskDefinition.taskType === 'customExecution' || types.CustomExecution.is(execution)) {
+    if (types.CustomExecution.is(execution)) {
         return fromCustomExecution(<theia.CustomExecution>execution, taskDto);
     }
 
@@ -770,7 +770,7 @@ export function toTask(taskDto: TaskDto): theia.Task {
         throw new Error('Task should be provided for converting');
     }
 
-    const { type, taskType, label, source, scope, problemMatcher, detail, command, args, options, group, presentation, ...properties } = taskDto;
+    const { type, label, source, scope, problemMatcher, detail, command, args, options, group, presentation, ...properties } = taskDto;
     const result = {} as theia.Task;
     result.name = label;
     result.source = source;
@@ -794,18 +794,18 @@ export function toTask(taskDto: TaskDto): theia.Task {
 
     result.definition = taskDefinition;
 
-    if (taskType === 'process') {
+    if (type === 'process') {
         result.execution = getProcessExecution(taskDto);
     }
 
     const execution = { command, args, options };
-    if (taskType === 'shell' || types.ShellExecution.is(execution)) {
+    if (type === 'shell' || types.ShellExecution.is(execution)) {
         result.execution = getShellExecution(taskDto);
     }
 
-    if (taskType === 'customExecution' || types.CustomExecution.is(execution)) {
+    if (type === 'customExecution' || types.CustomExecution.is(execution)) {
         result.execution = getCustomExecution(taskDto);
-        // if taskType is customExecution, we need to put all the information into taskDefinition,
+        // if task type is customExecution, we need to put all the information into taskDefinition,
         // because some parameters may be in taskDefinition.
         taskDefinition.label = label;
         taskDefinition.command = command;
@@ -849,29 +849,17 @@ export function fromProcessExecution(execution: theia.ProcessExecution, taskDto:
     return taskDto;
 }
 
-export function fromShellExecution(execution: theia.ShellExecution, taskDto: TaskDto): TaskDto {
-    const options = execution.options;
-    if (options) {
-        taskDto.options = getShellExecutionOptions(options);
-    }
+export function fromShellExecution(execution: theia.ShellExecution): rpc.ShellExecutionDTO {
+    return {
+        args: execution.args,
+        options: fromShellExecutionOptions(execution.options),
+        command: execution.command,
+        commandLine: execution.commandLine
 
-    const commandLine = execution.commandLine;
-    if (commandLine) {
-        taskDto.command = commandLine;
-        return taskDto;
-    }
-
-    const command = execution.command;
-    if (typeof command === 'string') {
-        taskDto.command = command;
-        taskDto.args = getShellArgs(execution.args);
-        return taskDto;
-    } else {
-        throw new Error('Converting ShellQuotedString command is not implemented');
-    }
+    };
 }
 
-export function fromCustomExecution(execution: theia.CustomExecution, taskDto: TaskDto): TaskDto {
+export function fromCustomExecution(execution: theia.CustomExecution): rpc.CustomExecutionDTO {
     const callback = execution.callback;
     if (callback) {
         taskDto.callback = callback;
@@ -925,7 +913,7 @@ export function getShellArgs(args: undefined | (string | theia.ShellQuotedString
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function getShellExecutionOptions(options: theia.ShellExecutionOptions): { [key: string]: any } {
+export function fromShellExecutionOptions(options?: theia.ShellExecutionOptions): rpc.ShellExecutionOptionsDTO {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = {} as { [key: string]: any };
 

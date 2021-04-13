@@ -21,7 +21,7 @@ import { TaskDefinitionRegistry } from './task-definition-registry';
 describe('TaskDefinitionRegistry', () => {
     let registry: TaskDefinitionRegistry;
     const definitionContributionA = {
-        taskType: 'extA',
+        type: 'extA',
         source: 'extA',
         required: ['extensionType'],
         properties: {
@@ -38,7 +38,7 @@ describe('TaskDefinitionRegistry', () => {
         }
     };
     const definitionContributionB = {
-        taskType: 'extA',
+        type: 'extA',
         source: 'extA',
         properties: {
             required: ['extensionType', 'taskLabel', 'taskDetailedLabel'],
@@ -62,19 +62,19 @@ describe('TaskDefinitionRegistry', () => {
     describe('register function', () => {
         it('should transform the task definition contribution and store it in memory', () => {
             registry.register(definitionContributionA);
-            expect(registry['definitions'].get(definitionContributionA.taskType)).to.be.ok;
-            expect(registry['definitions'].get(definitionContributionA.taskType)![0]).to.deep.equal(definitionContributionA);
+            expect(registry['definitions'].get(definitionContributionA.type)).to.be.ok;
+            expect(registry['definitions'].get(definitionContributionA.type)![0]).to.deep.equal(definitionContributionA);
         });
     });
 
     describe('getDefinitions function', () => {
         it('should return all definitions associated with the given type', () => {
             registry.register(definitionContributionA);
-            const defs1 = registry.getDefinitions(definitionContributionA.taskType);
+            const defs1 = registry.getDefinitions(definitionContributionA.type);
             expect(defs1.length).to.eq(1);
 
             registry.register(definitionContributionB);
-            const defs2 = registry.getDefinitions(definitionContributionA.taskType);
+            const defs2 = registry.getDefinitions(definitionContributionA.type);
             expect(defs2.length).to.eq(2);
         });
     });
@@ -84,7 +84,7 @@ describe('TaskDefinitionRegistry', () => {
             registry.register(definitionContributionA);
             registry.register(definitionContributionB);
             const defs = registry.getDefinition({
-                type: definitionContributionA.taskType, label: 'grunt task', task: 'build'
+                type: definitionContributionA.type, label: 'grunt task', task: 'build'
             });
             expect(defs).to.be.not.ok;
         });
@@ -93,16 +93,16 @@ describe('TaskDefinitionRegistry', () => {
             registry.register(definitionContributionA);
             registry.register(definitionContributionB);
             const defs = registry.getDefinition({
-                type: definitionContributionA.taskType, label: 'extension task', extensionType: 'extensionType', taskLabel: 'taskLabel'
+                type: definitionContributionA.type, label: 'extension task', extensionType: 'extensionType', taskLabel: 'taskLabel'
             });
             expect(defs).to.be.ok;
-            expect(defs!.taskType).to.be.eq(definitionContributionA.taskType);
+            expect(defs!.type).to.be.eq(definitionContributionA.type);
 
             const defs2 = registry.getDefinition({
-                type: definitionContributionA.taskType, label: 'extension task', extensionType: 'extensionType', taskLabel: 'taskLabel', taskDetailedLabel: 'taskDetailedLabel'
+                type: definitionContributionA.type, label: 'extension task', extensionType: 'extensionType', taskLabel: 'taskLabel', taskDetailedLabel: 'taskDetailedLabel'
             });
             expect(defs2).to.be.ok;
-            expect(defs2!.taskType).to.be.eq(definitionContributionB.taskType);
+            expect(defs2!.type).to.be.eq(definitionContributionB.type);
         });
     });
 });

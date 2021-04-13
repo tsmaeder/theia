@@ -271,7 +271,7 @@ export interface TaskClient {
 }
 
 export interface TaskDefinition {
-    taskType: string;
+    type: string;
     source: string;
     properties: {
         required: string[];

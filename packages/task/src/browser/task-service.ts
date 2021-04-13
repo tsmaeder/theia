@@ -727,8 +727,8 @@ export class TaskService implements TaskConfigurationClient {
     getTaskByTaskIdentifierAndTaskDefinition(taskDefinition: TaskDefinition | undefined, taskIdentifier: TaskIdentifier, tasks: TaskConfiguration[]): TaskConfiguration {
         const identifierProperties: string[] = [];
         let relevantTasks = tasks.filter(t =>
-            taskDefinition && t.hasOwnProperty('taskType') &&
-            taskDefinition['taskType'] === t['taskType'] &&
+            taskDefinition && t.hasOwnProperty('type') &&
+            taskDefinition['type'] === t['type'] &&
             t.hasOwnProperty('source') &&
             taskDefinition['source'] === t['source']);
 
@@ -737,9 +737,8 @@ export class TaskService implements TaskConfigurationClient {
         });
 
         identifierProperties.forEach(key => {
-            if (key === 'type' || key === 'taskType') {
-                relevantTasks = relevantTasks.filter(t => (t.hasOwnProperty('type') || t.hasOwnProperty('taskType')) &&
-                    ((taskIdentifier[key] === t['type']) || (taskIdentifier[key] === t['taskType'])));
+            if (key === 'type') {
+                relevantTasks = relevantTasks.filter(t => (t.hasOwnProperty('type') && taskIdentifier[key] === t['type']));
             } else {
                 relevantTasks = relevantTasks.filter(t => t.hasOwnProperty(key) && taskIdentifier[key] === t[key]);
             }

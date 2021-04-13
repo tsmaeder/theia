@@ -147,7 +147,7 @@ export class TaskSchemaUpdater implements JsonSchemaContribution {
     /** Returns an array of task types that are registered, including the default types */
     async getRegisteredTaskTypes(): Promise<string[]> {
         const serverSupportedTypes = await this.taskServer.getRegisteredTaskTypes();
-        const browserSupportedTypes = this.taskDefinitionRegistry.getAll().map(def => def.taskType);
+        const browserSupportedTypes = this.taskDefinitionRegistry.getAll().map(def => def.type);
         const allTypes = new Set([...serverSupportedTypes, ...browserSupportedTypes]);
         return Array.from(allTypes.values()).sort();
     }
@@ -163,8 +163,8 @@ export class TaskSchemaUpdater implements JsonSchemaContribution {
             } as IJSONSchema;
             const taskType = {
                 ...defaultTaskType,
-                enum: [def.taskType],
-                default: def.taskType,
+                enum: [def.type],
+                default: def.type,
                 description: 'The task type to customize'
             };
             customizedDetectedTask.properties!.type = taskType;
