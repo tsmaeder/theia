@@ -726,27 +726,17 @@ export class TaskService implements TaskConfigurationClient {
      */
     getTaskByTaskIdentifierAndTaskDefinition(taskDefinition: TaskDefinition | undefined, taskIdentifier: TaskIdentifier, tasks: TaskConfiguration[]): TaskConfiguration {
         const identifierProperties: string[] = [];
-        let relevantTasks = tasks.filter(t =>
-            taskDefinition && t.hasOwnProperty('taskType') &&
-            taskDefinition['taskType'] === t['taskType'] &&
-            t.hasOwnProperty('source') &&
-            taskDefinition['source'] === t['source']);
 
         Object.keys(taskIdentifier).forEach(key => {
             identifierProperties.push(key);
         });
 
         identifierProperties.forEach(key => {
-            if (key === 'type' || key === 'taskType') {
-                relevantTasks = relevantTasks.filter(t => (t.hasOwnProperty('type') || t.hasOwnProperty('taskType')) &&
-                    ((taskIdentifier[key] === t['type']) || (taskIdentifier[key] === t['taskType'])));
-            } else {
-                relevantTasks = relevantTasks.filter(t => t.hasOwnProperty(key) && taskIdentifier[key] === t[key]);
-            }
+            tasks = tasks.filter(t => t.hasOwnProperty(key) && taskIdentifier[key] === t[key]);
         });
 
-        if (relevantTasks.length > 0) {
-            return relevantTasks[0];
+        if (tasks.length > 0) {
+            return tasks[0];
         } else {
             // return empty TaskConfiguration
             return { 'label': '', '_scope': '', 'type': '' };
