@@ -809,14 +809,21 @@ export class TaskService implements TaskConfigurationClient {
             }
         }
         overridePropertiesFunction(task);
-
-        const resolvedTask = await this.getResolvedTask(task);
-        if (resolvedTask) {
-            // remove problem markers from the same source before running the task
-            await this.removeProblemMarkers(option);
+        this.addRecentTasks(task);
+        try {
+            const resolver = await this.taskResolverRegistry.getTaskResolver(task.type);
+            const resolvedTask = resolver ? await resolver.resolveTask(task) : task;
+            const excutionResolver = this.taskResolverRegistry.getExecutionResolver(resolvedTask.taskType || resolvedTask.type);
             overridePropertiesFunction(resolvedTask);
-            return this.runResolvedTask(resolvedTask, option);
+            const taskToRun = excutionResolver ? await excutionResolver.resolveTask(resolvedTask) : resolvedTask;
+
+            await this.removeProblemMarkers(option);
+            return this.runResolvedTask(taskToRun, option);
+        } catch (error) {
+            const errMessage = `Error resolving task '${task.label}': ${error}`;
+            this.logger.error(errMessage);
         }
+        return undefined;
     }
 
     /**
@@ -956,21 +963,6 @@ export class TaskService implements TaskConfigurationClient {
                 }
             }
         }
-    }
-
-    protected async getResolvedTask(task: TaskConfiguration): Promise<TaskConfiguration | undefined> {
-        let resolver = undefined;
-        let resolvedTask: TaskConfiguration;
-        try {
-            resolver = await this.taskResolverRegistry.getResolver(task.type);
-            resolvedTask = resolver ? await resolver.resolveTask(task) : task;
-        } catch (error) {
-            const errMessage = `Error resolving task '${task.label}': ${error}`;
-            this.logger.error(errMessage);
-            resolvedTask = task;
-        }
-        this.addRecentTasks(task);
-        return resolvedTask;
     }
 
     /**
