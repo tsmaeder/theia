@@ -794,22 +794,27 @@ export class TaskService implements TaskConfigurationClient {
     }
 
     protected async doRunTask(task: TaskConfiguration, option?: RunTaskOption): Promise<TaskInfo | undefined> {
+        let overridePropertiesFunction: (task: TaskConfiguration) => void = () => { };
         if (option && option.customization) {
             const taskDefinition = this.taskDefinitionRegistry.getDefinition(task);
             if (taskDefinition) { // use the customization object to override the task config
-                Object.keys(option.customization).forEach(customizedProperty => {
-                    // properties used to define the task cannot be customized
-                    if (customizedProperty !== 'type' && !taskDefinition.properties.all.some(pDefinition => pDefinition === customizedProperty)) {
-                        task[customizedProperty] = option.customization![customizedProperty];
-                    }
-                });
+                overridePropertiesFunction = tsk => {
+                    Object.keys(option.customization!).forEach(customizedProperty => {
+                        // properties used to define the task cannot be customized
+                        if (customizedProperty !== 'type' && !taskDefinition.properties.all.some(pDefinition => pDefinition === customizedProperty)) {
+                            tsk[customizedProperty] = option.customization![customizedProperty];
+                        }
+                    });
+                };
             }
         }
+        overridePropertiesFunction(task);
 
         const resolvedTask = await this.getResolvedTask(task);
         if (resolvedTask) {
             // remove problem markers from the same source before running the task
             await this.removeProblemMarkers(option);
+            overridePropertiesFunction(resolvedTask);
             return this.runResolvedTask(resolvedTask, option);
         }
     }
