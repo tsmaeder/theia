@@ -37,10 +37,10 @@ export class TasksExtImpl implements TasksExt {
     private callId = 0;
     private adaptersMap = new Map<number, TaskProviderAdapter>();
     private executions = new Map<number, theia.TaskExecution>();
-    protected callbackIdBase: string;
+    protected callbackIdBase: string = UUID.uuid4();
     protected callbackId: number;
-    protected customExecutionIds: Map<ExecutionCallback, string>;
-    protected customExecutionFunctions: Map<string, ExecutionCallback>;
+    protected customExecutionIds: Map<ExecutionCallback, string> = new Map();
+    protected customExecutionFunctions: Map<string, ExecutionCallback> = new Map();
     protected lastStartedTask: number | undefined;
 
     private readonly onDidExecuteTask: Emitter<theia.TaskStartEvent> = new Emitter<theia.TaskStartEvent>();
@@ -52,9 +52,6 @@ export class TasksExtImpl implements TasksExt {
 
     constructor(rpc: RPCProtocol, readonly terminalExt: TerminalServiceExtImpl) {
         this.proxy = rpc.getProxy(PLUGIN_RPC_CONTEXT.TASKS_MAIN);
-        this.customExecutionIds = new Map();
-        this.customExecutionFunctions = new Map();
-        this.callbackIdBase = UUID.uuid4();
         this.fetchTaskExecutions();
     }
 
@@ -189,7 +186,13 @@ export class TasksExtImpl implements TasksExt {
     $resolveTask(handle: number, task: TaskDto, token: theia.CancellationToken): Promise<TaskDto | undefined> {
         const adapter = this.adaptersMap.get(handle);
         if (adapter) {
-            return adapter.resolveTask(task, token);
+            return adapter.resolveTask(task, token).then(resolvedTask => {
+                if (resolvedTask && resolvedTask.taskType === 'customExecution') {
+                    resolvedTask.executionId = this.addCustomExecution(resolvedTask.callback);
+                    resolvedTask.callback = undefined;
+                }
+                return resolvedTask;
+            });
         } else {
             return Promise.reject(new Error('No adapter found to resolve task'));
         }

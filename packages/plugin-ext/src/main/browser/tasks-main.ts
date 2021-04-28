@@ -219,7 +219,7 @@ export class TasksMainImpl implements TasksMain, Disposable {
     }
 
     protected fromTaskConfiguration(task: TaskConfiguration): TaskDto {
-        const { group, presentation, _scope, _source, taskType, ...common } = task;
+        const { group, presentation, _scope, _source, ...common } = task;
         const partialDto: Partial<TaskDto> = {};
         if (presentation) {
             partialDto.presentation = this.convertTaskPresentation(presentation);
@@ -234,7 +234,6 @@ export class TasksMainImpl implements TasksMain, Disposable {
         return {
             ...common,
             ...partialDto,
-            taskType: taskType,
             scope: _scope,
             source: _source,
         };

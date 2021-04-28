@@ -127,6 +127,9 @@ export class TaskResolverRegistry {
      */
 
     registerTaskResolver(type: string, resolver: TaskResolver): Disposable {
+        if (this.taskResolvers.has(type)) {
+            console.warn(`Overriding task resolver for ${type}`);
+        }
         this.taskResolvers.set(type, resolver);
         return {
             dispose: () => this.taskResolvers.delete(type)
@@ -169,6 +172,9 @@ export class TaskResolverRegistry {
      * @returns a `Disposable` that can be invoked to unregister the given resolver
      */
     registerExecutionResolver(type: string, resolver: TaskResolver): Disposable {
+        if (this.executionResolvers.has(type)) {
+            console.warn(`Overriding execution resolver for ${type}`);
+        }
         this.executionResolvers.set(type, resolver);
         return {
             dispose: () => this.executionResolvers.delete(type)

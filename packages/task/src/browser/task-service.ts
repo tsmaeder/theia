@@ -43,7 +43,6 @@ import {
     TaskConfiguration,
     TaskConfigurationScope,
     TaskCustomization,
-    TaskDefinition,
     TaskExitedEvent,
     TaskIdentifier,
     TaskInfo,
@@ -697,18 +696,12 @@ export class TaskService implements TaskConfigurationClient {
             // TaskIdentifier object does not support tasks of type 'shell' (The same behavior as in VS Code).
             // So if we want the 'dependsOn' property to include tasks of type 'shell',
             // then we must mention their labels (in the 'dependsOn' property) and not to create a task identifier object for them.
-            const taskDefinition = this.taskDefinitionRegistry.getDefinition(taskIdentifier);
-            if (taskDefinition) {
-                currentTaskChildConfiguration = this.getTaskByTaskIdentifierAndTaskDefinition(taskDefinition, taskIdentifier, tasks);
-                if (!currentTaskChildConfiguration.type) {
-                    this.messageService.error(notEnoughDataError);
-                    throw new Error(notEnoughDataError);
-                }
-                return currentTaskChildConfiguration;
-            } else {
+            currentTaskChildConfiguration = this.getTaskByTaskIdentifier(taskIdentifier, tasks);
+            if (!currentTaskChildConfiguration.type) {
                 this.messageService.error(notEnoughDataError);
                 throw new Error(notEnoughDataError);
             }
+            return currentTaskChildConfiguration;
         } else {
             currentTaskChildConfiguration = tasks.filter(t => taskIdentifier === this.taskNameResolver.resolve(t))[0];
             return currentTaskChildConfiguration;
@@ -716,31 +709,17 @@ export class TaskService implements TaskConfigurationClient {
     }
 
     /**
-     * Gets the matched task from an array of task configurations by TaskDefinition and TaskIdentifier.
+     * Gets the matched task from an array of task configurations by TaskIdentifier.
      * In case that more than one task configuration matches, we returns the first one.
      *
-     * @param taskDefinition The task definition for the task configuration.
      * @param taskIdentifier The task label (string) or a JSON object which represents a TaskIdentifier (e.g. {"type":"npm", "script":"script1"})
      * @param tasks An array of task configurations.
-     * @returns The correct TaskConfiguration object which matches the taskDefinition and taskIdentifier.
+     * @returns The correct TaskConfiguration object which matches the taskIdentifier.
      */
-    getTaskByTaskIdentifierAndTaskDefinition(taskDefinition: TaskDefinition | undefined, taskIdentifier: TaskIdentifier, tasks: TaskConfiguration[]): TaskConfiguration {
-        const identifierProperties: string[] = [];
-
-        Object.keys(taskIdentifier).forEach(key => {
-            identifierProperties.push(key);
-        });
-
-        identifierProperties.forEach(key => {
-            tasks = tasks.filter(t => t.hasOwnProperty(key) && taskIdentifier[key] === t[key]);
-        });
-
-        if (tasks.length > 0) {
-            return tasks[0];
-        } else {
-            // return empty TaskConfiguration
-            return { 'label': '', '_scope': '', 'type': '' };
-        }
+    getTaskByTaskIdentifier(taskIdentifier: TaskIdentifier, tasks: TaskConfiguration[]): TaskConfiguration {
+        const requiredProperties = Object.keys(taskIdentifier);
+        const taskWithAllProperties = tasks.find(task => requiredProperties.every(property => task.hasOwnProperty(property) && task[property] === taskIdentifier[property]));
+        return taskWithAllProperties ?? { label: '', _scope: '', type: '' }; // Fall back to empty TaskConfiguration
     }
 
     async runTask(task: TaskConfiguration, option?: RunTaskOption): Promise<TaskInfo | undefined> {
@@ -813,9 +792,9 @@ export class TaskService implements TaskConfigurationClient {
         try {
             const resolver = await this.taskResolverRegistry.getTaskResolver(task.type);
             const resolvedTask = resolver ? await resolver.resolveTask(task) : task;
-            const excutionResolver = this.taskResolverRegistry.getExecutionResolver(resolvedTask.taskType || resolvedTask.type);
+            const executionResolver = this.taskResolverRegistry.getExecutionResolver(resolvedTask.taskType || resolvedTask.type);
             overridePropertiesFunction(resolvedTask);
-            const taskToRun = excutionResolver ? await excutionResolver.resolveTask(resolvedTask) : resolvedTask;
+            const taskToRun = executionResolver ? await executionResolver.resolveTask(resolvedTask) : resolvedTask;
 
             await this.removeProblemMarkers(option);
             return this.runResolvedTask(taskToRun, option);
