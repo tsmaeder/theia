@@ -1425,7 +1425,6 @@ declare module monaco.quickInput {
         buttons?: IQuickInputButton[];
         picked?: boolean;
         alwaysShow?: boolean;
-        execute?: (item: IQuickPickItem, lookFor: string) => void
     }
 
     // https://github.com/theia-ide/vscode/blob/standalone/0.23.x/src/vs/base/parts/quickinput/common/quickInput.ts#L306
@@ -1707,9 +1706,8 @@ declare module monaco.quickInput {
 
     // https://github.com/theia-ide/vscode/blob/standalone/0.23.x/src/vs/platform/quickinput/browser/pickerQuickAccess.ts#L92
     export class PickerQuickAccessProvider<T extends IPickerQuickAccessItem> extends Disposable implements IQuickAccessProvider {
-        constructor(private prefix: string, protected options?: IPickerQuickAccessProviderOptions<T>) {
-            super();
-        }
+        constructor(prefix: string, options?: IPickerQuickAccessProviderOptions<T>);
+
         provide(picker: IQuickPick<T>, token: CancellationToken): IDisposable;
         protected getPicks(filter: string, disposables: any, token: CancellationToken): Picks<T> | Promise<Picks<T>> | FastAndSlowPicks<T> | null;
     }
@@ -1825,7 +1823,24 @@ declare module monaco.quickInput {
         provide(picker: monaco.quickInput.IQuickPick<monaco.quickInput.IQuickPickItem>, token: CancellationToken): IDisposable;
     }
 
-    // https://github.com/theia-ide/vscode/blob/standalone/0.23.x/src/vs/platform/quickinput/common/quickAccess.ts#L101
+    export interface IQuickAccessProviderHelp {
+
+        /**
+         * The prefix to show for the help entry. If not provided,
+         * the prefix used for registration will be taken.
+         */
+        prefix?: string;
+
+        /**
+         * A description text to help understand the intent of the provider.
+         */
+        description: string;
+
+        /**
+         * Separation between provider for editors and global ones.
+         */
+        needsEditor: boolean;
+    }
     export interface IQuickAccessProviderDescriptor {
         /**
          * The actual provider that will be instantiated as needed.

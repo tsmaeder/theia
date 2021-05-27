@@ -15,15 +15,55 @@
  ********************************************************************************/
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { QuickInputService } from '@theia/core/lib/browser';
+import { InputBox, InputOptions, PickOptions, QuickInputButton, QuickInputService, QuickPickItem, QuickPickOptions } from '@theia/core/lib/browser';
 import { CancellationToken, Event } from '@theia/core/lib/common';
-import { injectable, inject, postConstruct } from '@theia/core/shared/inversify';
+import { injectable, inject } from '@theia/core/shared/inversify';
 
 @injectable()
-export class MonacoQuickInputService extends QuickInputService implements monaco.quickInput.IQuickInputService {
-
+export class MonacoQuickInputService implements QuickInputService {
+    private monacoService: MonacoQuickImplementation;
     @inject(monaco.contextKeyService.ContextKeyService)
     protected readonly contextKeyService: monaco.contextKeyService.ContextKeyService;
+
+    constructor() {
+        this.monacoService = new MonacoQuickImplementation(this.contextKeyService);
+        this.monacoService.init();
+    }
+
+    get backButton(): QuickInputButton {
+        return this.monacoService.backButton;
+    }
+
+    open(filter: string): void {
+        this.monacoService.open(filter);
+    }
+
+    createInputBox(): InputBox {
+        return this.monacoService.createInputBox();
+    }
+
+    input(options?: InputOptions, token?: CancellationToken): Promise<string | undefined> {
+        return this.monacoService.input();
+    }
+    pick<T extends QuickPickItem, O extends PickOptions<T>>(picks: T[] | Promise<T[]>, options?: O, token?: CancellationToken):
+        Promise<(O extends { canPickMany: true; } ? T[] : T) | undefined> {
+        return this.monacoService.pick(picks, options, token);
+    }
+    showQuickPick<T extends QuickPickItem>(items: T[], options?: QuickPickOptions<T>): Promise<T> {
+        return this.monacoService.showQuickPick<T>(items, options).then(item => {
+            if (item.execute) {
+                item.execute();
+            }
+            return item;
+        });
+    }
+    hide(): void {
+        return this.monacoService.hide();
+    }
+}
+
+@injectable()
+class MonacoQuickImplementation implements monaco.quickInput.IQuickInputService {
 
     controller: monaco.quickInput.QuickInputController;
     quickAccess: monaco.quickInput.IQuickAccessController;
@@ -33,14 +73,12 @@ export class MonacoQuickInputService extends QuickInputService implements monaco
 
     get backButton(): monaco.quickInput.IQuickInputButton { return this.controller.backButton; }
 
-    constructor() {
-        super();
+    constructor(protected readonly contextKeyService: monaco.contextKeyService.ContextKeyService) {
         this.initContainer();
         this.initController();
     }
 
-    @postConstruct()
-    protected async init(): Promise<void> {
+    async init(): Promise<void> {
         this.quickAccess = new monaco.quickInput.QuickAccessController(this, monaco.services.StaticServices.instantiationService.get());
     }
 
@@ -101,6 +139,8 @@ export class MonacoQuickInputService extends QuickInputService implements monaco
                     if (options?.onDidAccept) {
                         options.onDidAccept();
                     }
+                    quickPick.hide();
+                    resolve(quickPick.selectedItems[0]);
                 });
 
                 quickPick.onDidHide(() => {
@@ -128,11 +168,6 @@ export class MonacoQuickInputService extends QuickInputService implements monaco
                     if (options.onDidChangeSelection) {
                         options.onDidChangeSelection(quickPick, selectedItems);
                     }
-                    if (selectedItems[0].execute) {
-                        selectedItems[0].execute(selectedItems[0], quickPick.value);
-                    }
-                    quickPick.hide();
-                    resolve(selectedItems[0]);
                 });
             }
 
