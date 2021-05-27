@@ -1324,7 +1324,6 @@ declare module monaco.quickInput {
         buttons?: IQuickInputButton[];
         picked?: boolean;
         alwaysShow?: boolean;
-        execute?: (item: IQuickPickItem, lookFor: string) => void
     }
 
     export interface IQuickInputButton {
@@ -1575,14 +1574,6 @@ declare module monaco.quickInput {
         onDidTriggerItemButton?: Event<monaco.quickInput.IQuickPickItemButtonEvent<T>>;
     }
 
-    export interface IQuickAccessDataService {
-        getPicks(filter: string, token: CancellationToken): monaco.quickInput.Picks<monaco.quickInput.IAnythingQuickPickItem>
-            | Promise<monaco.quickInput.Picks<monaco.quickInput.IAnythingQuickPickItem>>
-            | monaco.quickInput.FastAndSlowPicks<monaco.quickInput.IAnythingQuickPickItem>
-            | null;
-        registerQuickAccessProvider(): void;
-    }
-
     export type Pick<T> = T | IQuickPickSeparator;
     // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
     export type PicksWithActive<T> = { items: Array<Pick<T>>, active?: T };
@@ -1591,9 +1582,8 @@ declare module monaco.quickInput {
     export type FastAndSlowPicks<T> = { picks: Picks<T>, additionalPicks: Promise<Picks<T>> };
 
     export class PickerQuickAccessProvider<T extends IPickerQuickAccessItem> extends Disposable implements IQuickAccessProvider {
-        constructor(private prefix: string, protected options?: IPickerQuickAccessProviderOptions<T>) {
-            super();
-        }
+        constructor(prefix: string, options?: IPickerQuickAccessProviderOptions<T>);
+
         provide(picker: IQuickPick<T>, token: CancellationToken): IDisposable;
         protected getPicks(filter: string, disposables: any, token: CancellationToken): Picks<T> | Promise<Picks<T>> | FastAndSlowPicks<T> | null;
     }
@@ -1701,6 +1691,25 @@ declare module monaco.quickInput {
          * closes or is replaced by another picker.
          */
         provide(picker: monaco.quickInput.IQuickPick<monaco.quickInput.IQuickPickItem>, token: CancellationToken): IDisposable;
+    }
+
+    export interface IQuickAccessProviderHelp {
+
+        /**
+         * The prefix to show for the help entry. If not provided,
+         * the prefix used for registration will be taken.
+         */
+        prefix?: string;
+
+        /**
+         * A description text to help understand the intent of the provider.
+         */
+        description: string;
+
+        /**
+         * Separation between provider for editors and global ones.
+         */
+        needsEditor: boolean;
     }
     export interface IQuickAccessProviderDescriptor {
         /**

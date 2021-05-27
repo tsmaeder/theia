@@ -14,6 +14,9 @@
  * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
  ********************************************************************************/
 
+import { CancellationToken, Disposable } from '../../common';
+import { QuickPicks } from './quick-input-service';
+
 export const QuickAccessContribution = Symbol('QuickAccessContribution');
 /**
  * The quick access contribution should be implemented to register custom quick access provider.
@@ -21,3 +24,32 @@ export const QuickAccessContribution = Symbol('QuickAccessContribution');
 export interface QuickAccessContribution {
     registerQuickAccessProvider(): void;
 }
+
+export interface QuickAccessProvider {
+    getPicks(filter: string, token: CancellationToken): QuickPicks | Promise<QuickPicks>;
+    reset?(): void;
+}
+
+export interface QuickAccessProviderHelp {
+    prefix?: string;
+    description: string;
+    needsEditor: boolean;
+}
+
+export interface QuickAccessProviderDescriptor {
+    readonly getInstance: () => QuickAccessProvider;
+    readonly prefix: string;
+    readonly placeholder?: string;
+    readonly helpEntries: QuickAccessProviderHelp[];
+    readonly contextKey?: string;
+}
+
+export const QuickAccessRegistry = Symbol('QuickAccessRegistry');
+
+export interface QuickAccessRegistry {
+    registerQuickAccessProvider(provider: QuickAccessProviderDescriptor): Disposable;
+    getQuickAccessProviders(): QuickAccessProviderDescriptor[];
+    getQuickAccessProvider(prefix: string): QuickAccessProviderDescriptor | undefined;
+    clear(): void;
+}
+

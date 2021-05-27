@@ -19,14 +19,15 @@ import { TaskService } from './task-service';
 import { TaskInfo, TaskConfiguration, TaskCustomization, TaskScope, TaskConfigurationScope } from '../common/task-protocol';
 import { TaskDefinitionRegistry } from './task-definition-registry';
 import URI from '@theia/core/lib/common/uri';
-import { LabelProvider, QuickInputService } from '@theia/core/lib/browser';
+import { LabelProvider, QuickAccessProvider, QuickAccessRegistry, QuickInputService } from '@theia/core/lib/browser';
 import { WorkspaceService } from '@theia/workspace/lib/browser';
 import { TerminalService } from '@theia/terminal/lib/browser/base/terminal-service';
 import { PreferenceService } from '@theia/core/lib/browser';
 import { TaskNameResolver } from './task-name-resolver';
 import { TaskSourceResolver } from './task-source-resolver';
 import { TaskConfigurationManager } from './task-configuration-manager';
-import { filterItems, QuickPickItem } from '@theia/core/lib/browser/quick-input/quick-input-service';
+import { filterItems, QuickPickItem, QuickPicks } from '@theia/core/lib/browser/quick-input/quick-input-service';
+import { CancellationToken } from '@theia/core/lib/common';
 
 @injectable()
 export class ConfigureTaskAction /* extends QuickOpenBaseAction */ {
@@ -66,8 +67,8 @@ export class TaskActionProvider /* implements QuickOpenActionProvider  */ {
 }
 
 @injectable()
-export class QuickOpenTask implements monaco.quickInput.IQuickAccessDataService {
-    readonly prefix: string = 'task ';
+export class QuickOpenTask implements QuickAccessProvider {
+    static readonly PREFIX = 'task ';
     readonly description: string = 'Run Task';
     protected items: Array<QuickPickItem> = [];
 
@@ -76,6 +77,9 @@ export class QuickOpenTask implements monaco.quickInput.IQuickAccessDataService 
 
     @inject(QuickInputService) @optional()
     protected readonly quickInputService: QuickInputService;
+
+    @inject(QuickAccessRegistry)
+    protected readonly quickAccessRegistry: QuickAccessRegistry;
 
     @inject(TaskActionProvider)
     protected readonly taskActionProvider: TaskActionProvider;
@@ -134,7 +138,7 @@ export class QuickOpenTask implements monaco.quickInput.IQuickAccessDataService 
                 execute: () => this.configure()
             }));
         }
-        this.quickInputService?.open(this.prefix);
+        this.quickInputService?.open(QuickOpenTask.PREFIX);
     }
 
     attach(): void {
@@ -162,7 +166,7 @@ export class QuickOpenTask implements monaco.quickInput.IQuickAccessDataService 
                     }
                 });
             }
-            this.quickInputService?.open(this.prefix);
+            this.quickInputService?.open(QuickOpenTask.PREFIX);
         });
     }
 
@@ -340,7 +344,7 @@ export class QuickOpenTask implements monaco.quickInput.IQuickAccessDataService 
         this.quickInputService?.showQuickPick(this.items, { placeholder: `Select the ${buildOrTestType} task to run` });
     }
 
-    async getPicks(filter: string, token: monaco.CancellationToken): Promise<monaco.quickInput.Picks<monaco.quickInput.IAnythingQuickPickItem>> {
+    async getPicks(filter: string, token: CancellationToken): Promise<QuickPicks> {
         if (this.items.length === 0) {
             await this.init();
         }
@@ -348,13 +352,12 @@ export class QuickOpenTask implements monaco.quickInput.IQuickAccessDataService 
     }
 
     registerQuickAccessProvider(): void {
-        monaco.platform.Registry.as<monaco.quickInput.IQuickAccessRegistry>('workbench.contributions.quickaccess').registerQuickAccessProvider({
-            ctor: TaskQuickAccessProvider,
-            prefix: TaskQuickAccessProvider.PREFIX,
+        this.quickAccessRegistry.registerQuickAccessProvider({
+            getInstance: () => this,
+            prefix: QuickOpenTask.PREFIX,
             placeholder: 'Select the task to run',
             helpEntries: [{ description: 'Run Task', needsEditor: false }]
         });
-        TaskQuickAccessProvider.dataService = this as monaco.quickInput.IQuickAccessDataService;
     }
 
     protected getRunningTaskLabel(task: TaskInfo): string {
@@ -444,10 +447,6 @@ export class TaskRunQuickOpenItem implements monaco.quickInput.IAnythingQuickPic
         return this.task.detail;
     }
 
-    accept(): void {
-        this.execute();
-    }
-
     execute(): void {
         const scope = this.task._scope;
         if (this.taskDefinitionRegistry && !!this.taskDefinitionRegistry.getDefinition(this.task)) {
@@ -471,9 +470,6 @@ export class ConfigureBuildOrTestTaskQuickOpenItem extends TaskRunQuickOpenItem 
         protected readonly taskSourceResolver: TaskSourceResolver
     ) {
         super(token, task, taskService, isMulti, taskDefinitionRegistry, taskNameResolver, taskSourceResolver);
-    }
-    accept(): void {
-        this.execute();
     }
 
     execute(): void {
@@ -739,26 +735,3 @@ export class TaskRestartRunningQuickOpen {
     }
 }
 
-export class TaskQuickAccessProvider extends monaco.quickInput.PickerQuickAccessProvider<monaco.quickInput.IQuickPickItem> {
-    static PREFIX = 'task ';
-    static dataService: monaco.quickInput.IQuickAccessDataService;
-
-    private static readonly NO_RESULTS_PICK: monaco.quickInput.IAnythingQuickPickItem = {
-        label: 'No matching tasks'
-    };
-
-    constructor() {
-        super(TaskQuickAccessProvider.PREFIX, {
-            canAcceptInBackground: true,
-            noResultsPick: TaskQuickAccessProvider.NO_RESULTS_PICK
-        });
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    getPicks(filter: string, disposables: any, token: monaco.CancellationToken): monaco.quickInput.Picks<monaco.quickInput.IAnythingQuickPickItem>
-        | Promise<monaco.quickInput.Picks<monaco.quickInput.IAnythingQuickPickItem>>
-        | monaco.quickInput.FastAndSlowPicks<monaco.quickInput.IAnythingQuickPickItem>
-        | null {
-        return TaskQuickAccessProvider.dataService?.getPicks(filter, token);
-    }
-}

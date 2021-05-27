@@ -15,7 +15,7 @@
  ********************************************************************************/
 
 import { inject, injectable, optional } from '@theia/core/shared/inversify';
-import { OpenerService, KeybindingRegistry } from '@theia/core/lib/browser';
+import { OpenerService, KeybindingRegistry, QuickAccessRegistry, QuickAccessProvider } from '@theia/core/lib/browser';
 import { WorkspaceService } from '@theia/workspace/lib/browser/workspace-service';
 import URI from '@theia/core/lib/common/uri';
 import { FileSearchService, WHITESPACE_QUERY_SEPARATOR } from '../common/file-search-service';
@@ -26,7 +26,7 @@ import { NavigationLocationService } from '@theia/editor/lib/browser/navigation/
 import * as fuzzy from '@theia/core/shared/fuzzy';
 import { MessageService } from '@theia/core/lib/common/message-service';
 import { FileSystemPreferences } from '@theia/filesystem/lib/browser';
-import { findMatches, QuickInputService } from '@theia/core/lib/browser/quick-input/quick-input-service';
+import { findMatches, QuickInputService, QuickPickItem, QuickPicks } from '@theia/core/lib/browser/quick-input/quick-input-service';
 
 export const quickFileOpen: Command = {
     id: 'file-search.openFile',
@@ -34,8 +34,12 @@ export const quickFileOpen: Command = {
     label: 'Open File...'
 };
 
+type FileQuickPickItem = QuickPickItem & { uri: URI };
+
 @injectable()
-export class QuickFileOpenService implements monaco.quickInput.IQuickAccessDataService {
+export class QuickFileOpenService implements QuickAccessProvider {
+    static readonly PREFIX = '';
+
     @inject(KeybindingRegistry)
     protected readonly keybindingRegistry: KeybindingRegistry;
     @inject(WorkspaceService)
@@ -44,6 +48,8 @@ export class QuickFileOpenService implements monaco.quickInput.IQuickAccessDataS
     protected readonly openerService: OpenerService;
     @inject(QuickInputService) @optional()
     protected readonly quickInputService: QuickInputService;
+    @inject(QuickAccessRegistry)
+    protected readonly quickAccessRegistry: QuickAccessRegistry;
     @inject(FileSearchService)
     protected readonly fileSearchService: FileSearchService;
     @inject(LabelProvider)
@@ -56,13 +62,12 @@ export class QuickFileOpenService implements monaco.quickInput.IQuickAccessDataS
     protected readonly fsPreferences: FileSystemPreferences;
 
     registerQuickAccessProvider(): void {
-        monaco.platform.Registry.as<monaco.quickInput.IQuickAccessRegistry>('workbench.contributions.quickaccess').registerQuickAccessProvider({
-            ctor: AnythingQuickAccessProvider,
-            prefix: AnythingQuickAccessProvider.PREFIX,
+        this.quickAccessRegistry.registerQuickAccessProvider({
+            getInstance: () => this,
+            prefix: QuickFileOpenService.PREFIX,
             placeholder: this.getPlaceHolder(),
             helpEntries: [{ description: 'Open File', needsEditor: false }]
         });
-        AnythingQuickAccessProvider.dataService = this as monaco.quickInput.IQuickAccessDataService;
     }
 
     /**
@@ -122,11 +127,11 @@ export class QuickFileOpenService implements monaco.quickInput.IQuickAccessDataS
         return undefined;
     }
 
-    async getPicks(filter: string, token: CancellationToken): Promise<monaco.quickInput.Picks<monaco.quickInput.IAnythingQuickPickItem>> {
+    async getPicks(filter: string, token: CancellationToken): Promise<QuickPicks> {
         const roots = this.workspaceService.tryGetRoots();
         this.currentLookFor = filter;
         const alreadyCollected = new Set<string>();
-        const recentlyUsedItems: Array<monaco.quickInput.IAnythingQuickPickItem> = [];
+        const recentlyUsedItems: QuickPicks = [];
 
         const locations = [...this.navigationLocationService.locations()].reverse();
         for (const location of locations) {
@@ -145,7 +150,9 @@ export class QuickFileOpenService implements monaco.quickInput.IQuickAccessDataS
                 if (token.isCancellationRequested || results.length <= 0) {
                     return [];
                 }
-                const fileSearchResultItems: Array<monaco.quickInput.IAnythingQuickPickItem> = [];
+
+                const result = [...recentlyUsedItems];
+                const fileSearchResultItems: FileQuickPickItem[] = [];
 
                 for (const fileUri of results) {
                     if (!alreadyCollected.has(fileUri)) {
@@ -160,11 +167,12 @@ export class QuickFileOpenService implements monaco.quickInput.IQuickAccessDataS
                 sortedResults.sort((a, b) => this.compareItems(a, b));
 
                 if (sortedResults.length > 0) {
-                    sortedResults.unshift({ type: 'separator', label: 'file results' });
+                    result.unshift({ type: 'separator', label: 'file results' });
+                    result.push(...sortedResults);
                 }
 
                 // Return the recently used items, followed by the search results.
-                return ([...recentlyUsedItems, ...sortedResults]);
+                return result;
             };
 
             return this.fileSearchService.find(filter, {
@@ -180,31 +188,9 @@ export class QuickFileOpenService implements monaco.quickInput.IQuickAccessDataS
             return roots.length !== 0 ? recentlyUsedItems : [];
         }
     }
-
-    /**
-     * Compare two `IAnythingQuickPickItem`.
-     *
-     * @param a `IAnythingQuickPickItem` for comparison.
-     * @param b `IAnythingQuickPickItem` for comparison.
-     * @param member the `IAnythingQuickPickItem` object member for comparison.
-     */
     protected compareItems(
-        a: monaco.quickInput.IAnythingQuickPickItem,
-        b: monaco.quickInput.IAnythingQuickPickItem,
-        member: 'label' | 'resource' = 'label'): number {
-
-        /**
-         * Normalize a given string.
-         *
-         * @param str the raw string value.
-         * @returns the normalized string value.
-         */
-        function normalize(str: string): string {
-            return str.trim().toLowerCase();
-        }
-
-        // Normalize the user query.
-        const query: string = normalize(this.currentLookFor);
+        left: FileQuickPickItem,
+        right: FileQuickPickItem): number {
 
         /**
          * Score a given string.
@@ -245,55 +231,17 @@ export class QuickFileOpenService implements monaco.quickInput.IQuickAccessDataS
             }
         }
 
-        // Get the item's member values for comparison.
-        let itemA = a[member]!;
-        let itemB = b[member]!;
+        const query: string = normalize(this.currentLookFor);
 
-        // If the `URI` is used as a comparison member, perform the necessary string conversions.
-        if (typeof itemA !== 'string') {
-            itemA = itemA.path.toString();
-        }
-        if (typeof itemB !== 'string') {
-            itemB = itemB.path.toString();
-        }
+        const compareByLabelScore = (l: FileQuickPickItem, r: FileQuickPickItem) => score(r.label) - score(l.label);
+        const compareByLabelIndex = (l: FileQuickPickItem, r: FileQuickPickItem) => r.label.indexOf(query) - l.label.indexOf(query);
+        const compareByLabel = (l: FileQuickPickItem, r: FileQuickPickItem) => r.label.localeCompare(l.label);
 
-        // Normalize the item labels.
-        itemA = normalize(itemA);
-        itemB = normalize(itemB);
+        const compareByPathLabelScore = (l: FileQuickPickItem, r: FileQuickPickItem) => score(r.uri.path.toString()) - score(l.uri.path.toString());
+        const compareByPathIndex = (l: FileQuickPickItem, r: FileQuickPickItem) => r.uri.path.toString().indexOf(query) - l.uri.path.toString().indexOf(query);
+        const compareByPathLabel = (l: FileQuickPickItem, r: FileQuickPickItem) => r.uri.path.toString().localeCompare(l.uri.path.toString());
 
-        // Score the item labels.
-        const scoreA: number = score(itemA);
-        const scoreB: number = score(itemB);
-
-        // If both label scores are identical, perform additional computation.
-        if (scoreA === scoreB) {
-
-            // Favor the label which have the smallest substring index.
-            const indexA: number = itemA.indexOf(query);
-            const indexB: number = itemB.indexOf(query);
-
-            if (indexA === indexB) {
-
-                // Favor the result with the shortest label length.
-                if (itemA.length !== itemB.length) {
-                    return (itemA.length < itemB.length) ? -1 : 1;
-                }
-
-                // Fallback to the alphabetical order.
-                const comparison = itemB.localeCompare(itemA);
-
-                // If the alphabetical comparison is equal, call `compareItems` recursively using the `URI` member instead.
-                if (comparison === 0) {
-                    return this.compareItems(a, b, 'resource');
-                }
-
-                return itemB.localeCompare(itemA);
-            }
-
-            return indexA - indexB;
-        }
-
-        return scoreB - scoreA;
+        return compareWithDiscriminators(left, right, compareByLabelScore, compareByLabelIndex, compareByLabel, compareByPathLabelScore, compareByPathIndex, compareByPathLabel);
     }
 
     openFile(uri: URI): void {
@@ -302,14 +250,13 @@ export class QuickFileOpenService implements monaco.quickInput.IQuickAccessDataS
             .catch(error => this.messageService.error(error));
     }
 
-    private toItem(lookFor: string, uriOrString: URI | string): monaco.quickInput.IAnythingQuickPickItem {
+    private toItem(lookFor: string, uriOrString: URI | string): FileQuickPickItem {
         const uri = uriOrString instanceof URI ? uriOrString : new URI(uriOrString);
         const label = this.labelProvider.getName(uri);
         const description = this.getItemDescription(uri);
         const iconClasses = this.getItemIconClasses(uri);
 
         return {
-            resource: uri,
             label,
             description,
             highlights: {
@@ -317,7 +264,8 @@ export class QuickFileOpenService implements monaco.quickInput.IQuickAccessDataS
                 description: findMatches(description, lookFor)
             },
             iconClasses,
-            accept: () => this.openFile(uri)
+            uri,
+            execute: () => this.openFile(uri)
         };
     }
 
@@ -347,27 +295,23 @@ export class QuickFileOpenService implements monaco.quickInput.IQuickAccessDataS
     }
 }
 
-export class AnythingQuickAccessProvider extends monaco.quickInput.PickerQuickAccessProvider<monaco.quickInput.IQuickPickItem> {
-    static PREFIX = '';
-    static dataService: monaco.quickInput.IQuickAccessDataService;
+/**
+ * Normalize a given string.
+ *
+ * @param str the raw string value.
+ * @returns the normalized string value.
+ */
+function normalize(str: string): string {
+    return str.trim().toLowerCase();
+}
 
-    private static readonly NO_RESULTS_PICK: monaco.quickInput.IAnythingQuickPickItem = {
-        label: 'No matching results'
-    };
+function compareWithDiscriminators<T>(left: T, right: T, ...discriminators: ((left: T, right: T) => number)[]): number {
+    let comparisonValue = 0;
+    let i = 0;
 
-    constructor() {
-        super(AnythingQuickAccessProvider.PREFIX, {
-            canAcceptInBackground: true,
-            noResultsPick: AnythingQuickAccessProvider.NO_RESULTS_PICK
-        });
+    while (comparisonValue === 0 && i < discriminators.length) {
+        comparisonValue = discriminators[i](left, right);
+        i++;
     }
-
-    // TODO: disposabled
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    getPicks(filter: string, disposables: any, token: monaco.CancellationToken): monaco.quickInput.Picks<monaco.quickInput.IAnythingQuickPickItem>
-        | Promise<monaco.quickInput.Picks<monaco.quickInput.IAnythingQuickPickItem>>
-        | monaco.quickInput.FastAndSlowPicks<monaco.quickInput.IAnythingQuickPickItem>
-        | null {
-        return AnythingQuickAccessProvider.dataService?.getPicks(filter, token);
-    }
+    return comparisonValue;
 }
