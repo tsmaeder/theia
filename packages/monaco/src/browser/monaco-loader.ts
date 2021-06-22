@@ -56,6 +56,7 @@ export function loadMonaco(vsRequire: any): Promise<void> {
                 'vs/editor/standalone/browser/simpleServices',
                 'vs/editor/standalone/browser/standaloneServices',
                 'vs/editor/standalone/browser/standaloneLanguages',
+                'vs/editor/standalone/browser/quickAccess/standaloneGotoLineQuickAccess',
                 'vs/base/parts/quickinput/browser/quickInput',
                 'vs/platform/quickinput/browser/quickInput',
                 'vs/platform/quickinput/common/quickAccess',
@@ -91,7 +92,7 @@ export function loadMonaco(vsRequire: any): Promise<void> {
             ], (commands: any, actions: any,
                 keybindingsRegistry: any, keybindingResolver: any, resolvedKeybinding: any, keybindingLabels: any,
                 keyCodes: any, mime: any, editorExtensions: any, simpleServices: any,
-                standaloneServices: any, standaloneLanguages: any, quickInput: any, quickInputPlatform: any,
+                standaloneServices: any, standaloneLanguages: any, standaloneGotoLineQuickAccess: any, quickInput: any, quickInputPlatform: any,
                 quickAccess: any, quickAccessBrowser: any, pickerQuickAccess: any, listWidget: any, // helpQuickAccess: any, commandsQuickAccess: any,
                 platformRegistry: any,
                 filters: any, themeService: any, styler: any, colorRegistry: any, color: any,
@@ -113,7 +114,7 @@ export function loadMonaco(vsRequire: any): Promise<void> {
                     standaloneLanguages, configuration, configurationModels,
                     resolverService, codeEditorService, codeEditorServiceImpl, markerService, openerService);
                 global.monaco.quickInput = Object.assign({}, quickInput, quickAccess, quickAccessBrowser, quickInputPlatform,
-                    pickerQuickAccess);
+                    pickerQuickAccess, standaloneGotoLineQuickAccess);
                 global.monaco.filters = filters;
                 global.monaco.theme = Object.assign({}, themeService, styler);
                 global.monaco.color = Object.assign({}, colorRegistry, color);
@@ -139,17 +140,9 @@ export function loadMonaco(vsRequire: any): Promise<void> {
     });
 }
 
-const INCLUDED_MONACO_PROVIDERS_PREFIXES = ['@', ':'];
 export function clearMonacoQuickAccessProviders(): void {
     const registry = monaco.platform.Registry.as<monaco.quickInput.IQuickAccessRegistry>('workbench.contributions.quickaccess');
-    const includedMonacoProviders = registry.getQuickAccessProviders().reduce((results, provider) => {
-        if (INCLUDED_MONACO_PROVIDERS_PREFIXES.indexOf(provider.prefix) > -1) {
-            results.push(Object.assign({}, provider));
-        }
-        return results;
-    }, <monaco.quickInput.IQuickAccessProviderDescriptor[]>[]);
 
     // Clear Monaco QuickAccessRegistry as it currently includes monaco internal providers and not Theia's providers
     registry.clear();
-    includedMonacoProviders.forEach(provider => registry.registerQuickAccessProvider(provider));
 }

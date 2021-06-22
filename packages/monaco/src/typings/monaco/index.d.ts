@@ -269,6 +269,7 @@ declare module monaco.editor {
         commandService?: monaco.commands.ICommandService;
         IWorkspaceEditService?: IBulkEditService;
         contextKeyService?: monaco.contextKeyService.IContextKeyService;
+        quickInputService?: monaco.quickInput.IQuickInputService;
     }
 
     // https://github.com/theia-ide/vscode/blob/standalone/0.23.x/src/vs/platform/editor/common/editor.ts#L68
@@ -299,6 +300,7 @@ declare module monaco.editor {
     }
 
     // https://github.com/theia-ide/vscode/blob/standalone/0.23.x/src/vs/editor/browser/services/codeEditorService.ts#L16
+
     export interface ICodeEditorService {
         getFocusedCodeEditor(): monaco.editor.ICodeEditor | undefined;
         getActiveCodeEditor(): monaco.editor.ICodeEditor | undefined;
@@ -1327,6 +1329,17 @@ declare module monaco.quickInput {
         dispose(): void;
     }
 
+    export class StandaloneGotoLineQuickAccessProvider {
+        constructor(private readonly editorService: ICodeEditorService);
+
+        protected get activeTextEditorControl(): IEditor | undefined;
+
+        readonly defaultFilterValue?: string | DefaultQuickAccessFilterValue;
+
+        provide(picker: monaco.quickInput.IQuickPick<monaco.quickInput.IQuickPickItem>, token: CancellationToken): IDisposable;
+
+    }
+
     // https://github.com/theia-ide/vscode/blob/standalone/0.23.x/src/vs/base/parts/quickinput/browser/quickInput.ts#L1112
     export class QuickInputController implements IDisposable {
         constructor(private options: IQuickInputOptions);
@@ -1966,8 +1979,8 @@ declare module monaco.quickOpen {
 
     // https://github.com/theia-ide/vscode/blob/standalone/0.23.x/src/vs/base/browser/ui/iconLabel/iconLabel.ts#L34
     export interface IIconLabelValueOptions {
-        title?: string;
         descriptionTitle?: string;
+        title?: string;
         hideIcon?: boolean;
         extraClasses?: string[];
         italic?: boolean;
