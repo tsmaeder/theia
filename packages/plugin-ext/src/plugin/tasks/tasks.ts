@@ -74,8 +74,7 @@ export class TasksExtImpl implements TasksExt {
         if (!id) {
             return undefined;
         }
-        const result = this.providedCustomExecutions.get(id);
-        return result ? result : this.oneOffCustomExecutions.get(id);
+        return this.providedCustomExecutions.get(id) ?? this.oneOffCustomExecutions.get(id);
     }
 
     private addProvidedCustomExecution(execution: theia.CustomExecution): string {
@@ -207,7 +206,7 @@ export class TasksExtImpl implements TasksExt {
                             addedExecutions++;
                         }
                         return dto;
-                    }).filter(task => !!task).map(task => task!);
+                    }).filter((task): task is TaskDto => !!task);
                 } else {
                     return undefined;
                 }
