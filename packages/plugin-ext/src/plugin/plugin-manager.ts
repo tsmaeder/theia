@@ -356,11 +356,12 @@ export class PluginManagerExtImpl implements PluginManagerExt, PluginManager {
             subscriptions: subscriptions,
             asAbsolutePath: asAbsolutePath,
             logPath: logPath,
+            logUri: Uri.file(globalStoragePath),
             storagePath: storagePath,
             storageUri: storagePath ? Uri.file(storagePath) : undefined,
             secrets,
             globalStoragePath: globalStoragePath,
-            globalStorageUri: Uri.file(globalStoragePath),
+            globalStorageUri: Uri.file(globalStoragePath), // #10033
             environmentVariableCollection: this.terminalService.getEnvironmentVariableCollection(plugin.model.id)
         };
         this.pluginContextsMap.set(plugin.model.id, pluginContext);

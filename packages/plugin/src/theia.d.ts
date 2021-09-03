@@ -3146,6 +3146,17 @@ declare module '@theia/plugin' {
          * the parent directory is guaranteed to be existent.
          */
         readonly logPath: string;
+
+        /**
+         * The uri of a directory in which the extension can create log files.
+         * The directory might not exist on disk and creation is up to the extension. However,
+         * the parent directory is guaranteed to be existent.
+         *
+         * @see {@link FileSystem `workspace.fs`} for how to read and write files and folders from
+         *  an uri.
+         */
+        readonly logUri: Uri;
+
     }
 
     /**
@@ -6146,9 +6157,9 @@ declare module '@theia/plugin' {
      * a feature works without further context, e.g without the need to resolve related
      * 'files'.
      *
-     * @sample `let sel:DocumentSelector = { scheme: 'file', language: 'typescript' }`;
+     * @sample `let sel:DocumentSelector = { scheme: 'file', language: 'typescript' }`; #bug 10025
      */
-    export type DocumentSelector = DocumentFilter | string | Array<DocumentFilter | string>;
+    export type DocumentSelector = DocumentFilter | string | ReadonlyArray<DocumentFilter | string>;
 
     /**
      * A tuple of two characters, like a pair of
@@ -6284,6 +6295,48 @@ declare module '@theia/plugin' {
          * The language's rules to be evaluated when pressing Enter.
          */
         onEnterRules?: OnEnterRule[];
+
+        /**
+         * https://github.com/eclipse-theia/theia/issues/10031
+         * **Deprecated** Do not use.
+         *
+         * @deprecated Will be replaced by a better API soon.
+         */
+        __electricCharacterSupport?: {
+            /**
+             * This property is deprecated and will be **ignored** from
+             * the editor.
+             * @deprecated
+             */
+            brackets?: any;
+            /**
+             * This property is deprecated and not fully supported anymore by
+             * the editor (scope and lineStart are ignored).
+             * Use the autoClosingPairs property in the language configuration file instead.
+             * @deprecated
+             */
+            docComment?: {
+                scope: string;
+                open: string;
+                lineStart: string;
+                close?: string;
+            };
+        };
+
+        /**
+         * https://github.com/eclipse-theia/theia/issues/10031
+         * 
+         * **Deprecated** Do not use.
+         *
+         * @deprecated * Use the autoClosingPairs property in the language configuration file instead.
+         */
+        __characterPairSupport?: {
+            autoClosingPairs: {
+                open: string;
+                close: string;
+                notIn?: string[];
+            }[];
+        };
 
     }
 
@@ -10609,6 +10662,11 @@ declare module '@theia/plugin' {
          * The resource identifier of this item.
          */
         uri: Uri;
+
+        /**
+         * Tags for this symbol.
+         */
+        tags?: readonly SymbolTag[];
 
         /**
          * The range enclosing this symbol not including leading/trailing whitespace but everything else, e.g. comments and code.
