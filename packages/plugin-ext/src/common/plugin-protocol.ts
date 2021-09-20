@@ -803,8 +803,6 @@ export function buildFrontendModuleName(plugin: PluginPackage | PluginModel): st
 
 export const HostedPluginClient = Symbol('HostedPluginClient');
 export interface HostedPluginClient {
-    postMessage(pluginHost: string, message: string): Promise<void>;
-
     log(logPart: LogPart): void;
 
     onDidDeploy(): void;
@@ -846,9 +844,6 @@ export interface HostedPluginServer extends JsonRpcServer<HostedPluginClient> {
     getDeployedPlugins(params: GetDeployedPluginsParams): Promise<DeployedPlugin[]>;
 
     getExtPluginAPI(): Promise<ExtPluginApi[]>;
-
-    onMessage(targetHost: string, message: string): Promise<void>;
-
 }
 
 export const PLUGIN_HOST_BACKEND = 'main';

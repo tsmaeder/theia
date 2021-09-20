@@ -36,7 +36,7 @@ export class TestWebSocketChannel extends WebSocketChannel {
             this.fireClose(code, reason)
         );
         socket.on('message', data => {
-            this.handleMessage(JSON.parse(data.toString()));
+            this.handleMessage(WebSocketChannel.parseMessage(data.toString()));
         });
         socket.on('open', () =>
             this.open(path)

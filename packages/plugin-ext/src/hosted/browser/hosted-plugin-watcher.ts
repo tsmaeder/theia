@@ -21,30 +21,20 @@ import { LogPart } from '../../common/types';
 
 @injectable()
 export class HostedPluginWatcher {
-    private onPostMessage = new Emitter<{ pluginHostId: string, message: string }>();
     private onLogMessage = new Emitter<LogPart>();
 
     private readonly onDidDeployEmitter = new Emitter<void>();
     readonly onDidDeploy = this.onDidDeployEmitter.event;
 
     getHostedPluginClient(): HostedPluginClient {
-        const messageEmitter = this.onPostMessage;
         const logEmitter = this.onLogMessage;
         return {
-            postMessage(pluginHostId, message: string): Promise<void> {
-                messageEmitter.fire({ pluginHostId, message });
-                return Promise.resolve();
-            },
             log(logPart: LogPart): Promise<void> {
                 logEmitter.fire(logPart);
                 return Promise.resolve();
             },
             onDidDeploy: () => this.onDidDeployEmitter.fire(undefined)
         };
-    }
-
-    get onPostMessageEvent(): Event<{ pluginHostId: string, message: string }> {
-        return this.onPostMessage.event;
     }
 
     get onLogMessageEvent(): Event<LogPart> {

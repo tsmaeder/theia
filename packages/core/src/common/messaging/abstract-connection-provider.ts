@@ -105,7 +105,7 @@ export abstract class AbstractConnectionProvider<AbstractOptions extends object>
     protected abstract createChannel(id: number): WebSocketChannel;
 
     protected handleIncomingRawMessage(data: string): void {
-        const message: WebSocketChannel.Message = JSON.parse(data);
+        const message: WebSocketChannel.Message = WebSocketChannel.parseMessage(data);
         const channel = this.channels.get(message.id);
         if (channel) {
             channel.handleMessage(message);

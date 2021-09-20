@@ -33,6 +33,8 @@ import { HostedPluginCliContribution } from './hosted-plugin-cli-contribution';
 import { HostedPluginDeployerHandler } from './hosted-plugin-deployer-handler';
 import { PluginUriFactory } from './scanners/plugin-uri-factory';
 import { FilePluginUriFactory } from './scanners/file-plugin-uri-factory';
+import { MessagingService } from '@theia/core/lib/node/messaging/messaging-service';
+import { PluginHostConnection } from './plugin-host-connection';
 
 const commonHostedConnectionModule = ConnectionContainerModule.create(({ bind, bindBackendService }) => {
     bind(HostedPluginProcess).toSelf().inSingletonScope();
@@ -68,6 +70,9 @@ export function bindCommonHostedBackend(bind: interfaces.Bind): void {
 
     bind(ConnectionContainerModule).toConstantValue(commonHostedConnectionModule);
     bind(PluginUriFactory).to(FilePluginUriFactory).inSingletonScope();
+
+    bind(PluginHostConnection).toSelf().inSingletonScope();
+    bind(MessagingService.Contribution).toService(PluginHostConnection);
 }
 
 export function bindHostedBackend(bind: interfaces.Bind): void {

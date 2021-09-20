@@ -24,6 +24,7 @@ import { HostedPluginCliContribution } from './hosted-plugin-cli-contribution';
 import * as psTree from 'ps-tree';
 import { Deferred } from '@theia/core/lib/common/promise-util';
 import { LocalizationProvider } from '@theia/core/lib/node/i18n/localization-provider';
+import { PluginHostConnection } from './plugin-host-connection';
 
 export interface IPCConnectionOptions {
     readonly serverName: string;
@@ -58,6 +59,9 @@ export class HostedPluginProcess implements ServerPluginRunner {
 
     @inject(LocalizationProvider)
     protected readonly localizationProvider: LocalizationProvider;
+
+    @inject(PluginHostConnection)
+    protected readonly pluginHostConnection: PluginHostConnection;
 
     private childProcess: cp.ChildProcess | undefined;
     private client: HostedPluginClient;
@@ -157,9 +161,7 @@ export class HostedPluginProcess implements ServerPluginRunner {
             args: []
         });
         this.childProcess.on('message', message => {
-            if (this.client) {
-                this.client.postMessage(PLUGIN_HOST_BACKEND, message);
-            }
+            this.pluginHostConnection.send(PLUGIN_HOST_BACKEND, message);
         });
     }
 

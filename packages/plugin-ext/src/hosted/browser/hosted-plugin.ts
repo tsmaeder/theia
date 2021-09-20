@@ -64,6 +64,7 @@ import { JsonSchemaStore } from '@theia/core/lib/browser/json-schema-store';
 import { FileService, FileSystemProviderActivationEvent } from '@theia/filesystem/lib/browser/file-service';
 import { PluginCustomEditorRegistry } from '../../main/browser/custom-editors/plugin-custom-editor-registry';
 import { CustomEditorWidget } from '../../main/browser/custom-editors/custom-editor-widget';
+import { WebSocketConnectionProvider } from '@theia/core/lib/browser';
 
 export type PluginHost = 'frontend' | string;
 export type DebugActivationEvent = 'onDebugResolve' | 'onDebugInitialConfigurations' | 'onDebugAdapterProtocolTracker';
@@ -82,6 +83,9 @@ export class HostedPluginSupport {
 
     @inject(HostedPluginServer)
     private readonly server: JsonRpcProxy<HostedPluginServer>;
+
+    @inject(WebSocketConnectionProvider)
+    private readonly connectionProvider: WebSocketConnectionProvider;
 
     @inject(HostedPluginWatcher)
     private readonly watcher: HostedPluginWatcher;
@@ -451,7 +455,7 @@ export class HostedPluginSupport {
         let manager = this.managers.get(host);
         if (!manager) {
             const pluginId = getPluginId(hostContributions[0].plugin.metadata.model);
-            const rpc = this.initRpc(host, pluginId);
+            const rpc = await this.initRpc(host, pluginId);
             toDisconnect.push(rpc);
 
             manager = rpc.getProxy(MAIN_RPC_CONTEXT.HOSTED_PLUGIN_MANAGER_EXT);
@@ -499,26 +503,32 @@ export class HostedPluginSupport {
         return manager;
     }
 
-    protected initRpc(host: PluginHost, pluginId: string): RPCProtocol {
-        const rpc = host === 'frontend' ? new PluginWorker().rpc : this.createServerRpc(host);
+    protected async initRpc(host: PluginHost, pluginId: string): Promise<RPCProtocol> {
+        const rpc = host === 'frontend' ? new PluginWorker().rpc : await this.createServerRpc(host);
         setUpPluginApi(rpc, this.container);
         this.mainPluginApiProviders.getContributions().forEach(p => p.initialize(rpc, this.container));
         return rpc;
     }
 
-    private createServerRpc(pluginHostId: string): RPCProtocol {
-        const emitter = new Emitter<string>();
-        this.watcher.onPostMessageEvent(received => {
-            if (pluginHostId === received.pluginHostId) {
-                emitter.fire(received.message);
-            }
+    private createServerRpc(pluginHostId: string): Promise<RPCProtocol> {
+        const waitForOpen = new Deferred<RPCProtocol>();
+
+        this.connectionProvider.openChannel(`pluginAPI/${pluginHostId}`, channel => {
+            const emitter = new Emitter<string>();
+
+            channel.onMessage(data => {
+                emitter.fire(data);
+            });
+
+            waitForOpen.resolve(new RPCProtocolImpl({
+                onMessage: emitter.event,
+                send: message => {
+                    channel.send(message);
+                }
+            }));
         });
-        return new RPCProtocolImpl({
-            onMessage: emitter.event,
-            send: message => {
-                this.server.onMessage(pluginHostId, message);
-            }
-        });
+        return waitForOpen.promise;
+
     }
 
     private async updateStoragePath(): Promise<void> {

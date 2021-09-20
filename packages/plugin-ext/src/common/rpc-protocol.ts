@@ -83,7 +83,6 @@ export class RPCProtocolImpl implements RPCProtocol {
     private lastMessageId = 0;
     private readonly cancellationTokenSources = new Map<string, CancellationTokenSource>();
     private readonly pendingRPCReplies = new Map<string, Deferred<any>>();
-    private readonly multiplexer: RPCMultiplexer;
 
     private replacer: (key: string | undefined, value: any) => any;
     private reviver: (key: string | undefined, value: any) => any;
@@ -92,14 +91,11 @@ export class RPCProtocolImpl implements RPCProtocol {
         Disposable.create(() => { /* mark as no disposed */ })
     );
 
-    constructor(connection: MessageConnection, transformations?: {
+    constructor(private connection: MessageConnection, transformations?: {
         replacer?: (key: string | undefined, value: any) => any,
-        reviver?: (key: string | undefined, value: any) =>  any
+        reviver?: (key: string | undefined, value: any) => any
     }) {
-        this.toDispose.push(
-            this.multiplexer = new RPCMultiplexer(connection)
-        );
-        this.multiplexer.onMessage(msg => this.receiveOneMessage(msg));
+        connection.onMessage(msg => this.receiveOneMessage(msg));
         this.toDispose.push(Disposable.create(() => {
             this.proxies.clear();
             for (const reply of this.pendingRPCReplies.values()) {
@@ -172,12 +168,12 @@ export class RPCProtocolImpl implements RPCProtocol {
         if (cancellationToken) {
             args.push('add.cancellation.token');
             cancellationToken.onCancellationRequested(() =>
-                this.multiplexer.send(this.cancel(callId))
+                this.connection.send(this.cancel(callId))
             );
         }
 
         this.pendingRPCReplies.set(callId, result);
-        this.multiplexer.send(this.request(callId, proxyId, methodName, args));
+        this.connection.send(this.request(callId, proxyId, methodName, args));
         return result.promise;
     }
 
@@ -233,10 +229,10 @@ export class RPCProtocolImpl implements RPCProtocol {
 
         invocation.then(result => {
             this.cancellationTokenSources.delete(callId);
-            this.multiplexer.send(this.replyOK(callId, result));
+            this.connection.send(this.replyOK(callId, result));
         }, error => {
             this.cancellationTokenSources.delete(callId);
-            this.multiplexer.send(this.replyErr(callId, error));
+            this.connection.send(this.replyErr(callId, error));
         });
     }
 
@@ -323,7 +319,7 @@ function canceled(): Error {
  *  - multiple messages to be sent from one stack get sent in bulk at `process.nextTick`.
  *  - each incoming message is handled in a separate `process.nextTick`.
  */
-class RPCMultiplexer implements Disposable, MessageConnection {
+export class RPCMultiplexer implements Disposable, MessageConnection {
 
     private readonly connection: MessageConnection;
     private readonly sendAccumulatedBound: () => void;

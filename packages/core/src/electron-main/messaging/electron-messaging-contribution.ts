@@ -87,7 +87,7 @@ export class ElectronMessagingContribution implements ElectronMainApplicationCon
                 this.windowChannels.set(sender.id, channels = new Map<number, WebSocketChannel>());
             }
             // Start parsing the message to extract the channel id and route
-            const message: WebSocketChannel.Message = JSON.parse(data.toString());
+            const message: WebSocketChannel.Message = WebSocketChannel.parseMessage(data.toString());
             // Someone wants to open a logical channel
             if (message.kind === 'open') {
                 const { id, path } = message;

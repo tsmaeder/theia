@@ -111,11 +111,6 @@ export class HostedPluginServerImpl implements HostedPluginServer {
         return plugins;
     }
 
-    onMessage(pluginHostId: string, message: string): Promise<void> {
-        this.hostedPlugin.onMessage(pluginHostId, message);
-        return Promise.resolve();
-    }
-
     getExtPluginAPI(): Promise<ExtPluginApi[]> {
         return Promise.resolve(this.extPluginAPIContributions.getContributions().map(p => p.provideApi()));
     }

@@ -15,17 +15,11 @@
  ********************************************************************************/
 
 import { injectable, inject, multiInject, postConstruct, optional } from '@theia/core/shared/inversify';
-import { ILogger, ConnectionErrorHandler } from '@theia/core/lib/common';
+import { ILogger } from '@theia/core/lib/common';
 import { HostedPluginClient, PluginModel, ServerPluginRunner, DeployedPlugin } from '../../common/plugin-protocol';
 import { LogPart } from '../../common/types';
 import { HostedPluginProcess } from './hosted-plugin-process';
-
-export interface IPCConnectionOptions {
-    readonly serverName: string;
-    readonly logger: ILogger;
-    readonly args: string[];
-    readonly errorHandler?: ConnectionErrorHandler;
-}
+import { PluginHostConnection } from './plugin-host-connection';
 
 @injectable()
 export class HostedPluginSupport {
@@ -38,6 +32,9 @@ export class HostedPluginSupport {
     @inject(HostedPluginProcess)
     protected readonly hostedPluginProcess: HostedPluginProcess;
 
+    @inject(PluginHostConnection)
+    protected readonly pluginHostConnection: PluginHostConnection;
+
     /**
      * Optional runners to delegate some work
      */
@@ -49,6 +46,9 @@ export class HostedPluginSupport {
     protected init(): void {
         this.pluginRunners.forEach(runner => {
             runner.setDefault(this.hostedPluginProcess);
+        });
+        this.pluginHostConnection.onMessage(({ pluginHostId, message }) => {
+            this.onMessage(pluginHostId, message);
         });
     }
 

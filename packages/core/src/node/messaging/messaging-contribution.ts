@@ -197,7 +197,7 @@ export class MessagingContribution implements BackendApplicationContribution, Me
         const channels = new Map<number, WebSocketChannel>();
         socket.on('message', data => {
             try {
-                const message: WebSocketChannel.Message = JSON.parse(data.toString());
+                const message: WebSocketChannel.Message = WebSocketChannel.parseMessage(data.toString());
                 if (message.kind === 'open') {
                     const { id, path } = message;
                     const channel = this.createChannel(id, socket);
