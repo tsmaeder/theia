@@ -30,6 +30,7 @@ import URI from '@theia/core/lib/common/uri';
 import { CancellationToken, CancellationTokenSource } from '@theia/core/shared/vscode-languageserver-protocol';
 import { Range, Position } from '../plugin/types-impl';
 import { BinaryBuffer } from '@theia/core/lib/common/buffer';
+import { Base64 } from '@theia/core/lib/common/base64';
 
 export interface MessageConnection {
     send(msg: string): void;
@@ -94,7 +95,7 @@ export class RPCProtocolImpl implements RPCProtocol {
 
     constructor(connection: MessageConnection, transformations?: {
         replacer?: (key: string | undefined, value: any) => any,
-        reviver?: (key: string | undefined, value: any) =>  any
+        reviver?: (key: string | undefined, value: any) => any
     }) {
         this.toDispose.push(
             this.multiplexer = new RPCMultiplexer(connection)
@@ -422,10 +423,9 @@ export namespace ObjectsTransferrer {
                 data: uri.toString()
             } as SerializedObject;
         } else if (value instanceof BinaryBuffer) {
-            const bytes = [...value.buffer.values()];
             return {
                 $type: SerializedObjectType.TEXT_BUFFER,
-                data: JSON.stringify({ bytes })
+                data: Base64.encode(value.buffer)
             };
         }
 
@@ -447,8 +447,7 @@ export namespace ObjectsTransferrer {
                     const end = new Position(obj.end.line, obj.end.character);
                     return new Range(start, end);
                 case SerializedObjectType.TEXT_BUFFER:
-                    const data: { bytes: number[] } = JSON.parse(value.data);
-                    return BinaryBuffer.wrap(Uint8Array.from(data.bytes));
+                    return Base64.decode(value.data);
             }
         }
 

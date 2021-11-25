@@ -174,6 +174,12 @@ export class FileMenuContribution implements MenuContribution {
             commandId: FileDownloadCommands.DOWNLOAD.id,
             order: 'b'
         });
+
+        registry.registerMenuAction(downloadUploadMenu, {
+            commandId: FileSystemCommands.TEST.id,
+            order: 'c'
+        });
+
     }
 
 }

@@ -38,6 +38,7 @@ import { FileSystemWatcherErrorHandler } from './filesystem-watcher-error-handle
 import { UTF8 } from '@theia/core/lib/common/encodings';
 import { FilepathBreadcrumbsContribution } from './breadcrumbs/filepath-breadcrumbs-contribution';
 import { BreadcrumbsFileTreeWidget, createFileTreeBreadcrumbsWidget } from './breadcrumbs/filepath-breadcrumbs-container';
+import { fileSystemTestPath, FileSystemTestServer } from '../common/file-system-test-protocol';
 
 export default new ContainerModule(bind => {
     bindFileSystemPreferences(bind);
@@ -48,6 +49,10 @@ export default new ContainerModule(bind => {
     bind(RemoteFileSystemServer).toDynamicValue(ctx =>
         WebSocketConnectionProvider.createProxy(ctx.container, remoteFileSystemPath, new RemoteFileSystemProxyFactory())
     );
+    bind(FileSystemTestServer).toDynamicValue(ctx =>
+        WebSocketConnectionProvider.createProxy(ctx.container, fileSystemTestPath)
+    );
+
     bind(RemoteFileSystemProvider).toSelf().inSingletonScope();
     bind(RemoteFileServiceContribution).toSelf().inSingletonScope();
     bind(FileServiceContribution).toService(RemoteFileServiceContribution);

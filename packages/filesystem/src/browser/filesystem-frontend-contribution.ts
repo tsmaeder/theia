@@ -34,6 +34,7 @@ import { FileUploadService, FileUploadResult } from './file-upload-service';
 import { FileService, UserFileOperationEvent } from './file-service';
 import { FileChangesEvent, FileChangeType, FileOperation } from '../common/files';
 import { Deferred } from '@theia/core/lib/common/promise-util';
+import { RemoteFileSystemServer } from '../common/remote-file-system-provider';
 
 export namespace FileSystemCommands {
 
@@ -43,6 +44,11 @@ export namespace FileSystemCommands {
         label: 'Upload Files...'
     }, 'theia/filesystem/uploadFiles', CommonCommands.FILE_CATEGORY_KEY);
 
+    export const TEST = Command.toLocalizedCommand({
+        id: 'file.test',
+        category: CommonCommands.FILE_CATEGORY,
+        label: 'Test File Performance...'
+    }, 'theia/filesystem/testFiles', CommonCommands.FILE_CATEGORY_KEY);
 }
 
 export interface NavigatableWidgetMoveSnapshot {
@@ -76,6 +82,9 @@ export class FileSystemFrontendContribution implements FrontendApplicationContri
 
     @inject(FileService)
     protected readonly fileService: FileService;
+
+    @inject(RemoteFileSystemServer)
+    protected readonly fileSystemTest: RemoteFileSystemServer;
 
     protected onDidChangeEditorFileEmitter = new Emitter<{ editor: NavigatableWidget, type: FileChangeType }>();
     readonly onDidChangeEditorFile = this.onDidChangeEditorFileEmitter.event;
@@ -126,6 +135,25 @@ export class FileSystemFrontendContribution implements FrontendApplicationContri
             isVisible: selection => this.canUpload(selection),
             execute: selection => this.upload(selection)
         }));
+
+        const message: number[] = [];
+
+        for (let i = 0; i < 1300000; i++) {
+            message.push(i % 255);
+        }
+
+
+        commands.registerCommand(FileSystemCommands.TEST, {
+            execute: async () => {
+                const before = Date.now();
+                const replied = await this.fileSystemTest.readFile('file:///C:/Users/thomas/Documents/Thomas.jpg');
+                const after = Date.now();
+                JSON.stringify(replied);
+                console.log('after = ' + after % 10000);
+                console.log(`sending ${replied.length} characters took = ` + (after - before));
+            }
+        });
+
     }
 
     protected canUpload({ fileStat }: FileSelection): boolean {

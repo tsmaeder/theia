@@ -256,12 +256,15 @@ export class DiskFileSystemProvider implements Disposable,
     // #region File Reading/Writing
 
     async readFile(resource: URI): Promise<Uint8Array> {
+        const before = Date.now();
         try {
             const filePath = this.toFilePath(resource);
 
             return await promisify(readFile)(filePath);
         } catch (error) {
             throw this.toFileSystemProviderError(error);
+        } finally {
+            console.log(`readFile from disk took ${Date.now() - before}ms`);
         }
     }
 

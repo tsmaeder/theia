@@ -31,6 +31,8 @@ import { EncodingService } from '@theia/core/lib/common/encoding-service';
 import { BackendApplicationContribution, IPCConnectionProvider } from '@theia/core/lib/node';
 import { JsonRpcProxyFactory, ConnectionErrorHandler } from '@theia/core';
 import { FileSystemWatcherServiceDispatcher } from './filesystem-watcher-dispatcher';
+import { FileSystemTestClient, fileSystemTestPath, FileSystemTestServer } from '../common/file-system-test-protocol';
+import { FileSystemTestServerImpl } from './file-system-test';
 
 export const NSFW_SINGLE_THREADED = process.argv.includes('--no-cluster');
 export const NSFW_WATCHER_VERBOSE = process.argv.includes('--nsfw-watcher-verbose');
@@ -60,6 +62,17 @@ export default new ContainerModule(bind => {
             client.onDidCloseConnection(() => server.dispose());
             return server;
         }, RemoteFileSystemProxyFactory)
+    ).inSingletonScope();
+
+    bind(FileSystemTestServerImpl).toSelf();
+    bind(FileSystemTestServer).toService(FileSystemTestServerImpl);
+    bind(ConnectionHandler).toDynamicValue(ctx =>
+        new JsonRpcConnectionHandler<FileSystemTestClient>(fileSystemTestPath, client => {
+            const server = ctx.container.get<FileSystemTestServer>(FileSystemTestServer);
+            server.setClient(client);
+            client.onDidCloseConnection(() => server.dispose());
+            return server;
+        })
     ).inSingletonScope();
     bind(NodeFileUploadService).toSelf().inSingletonScope();
     bind(BackendApplicationContribution).toService(NodeFileUploadService);

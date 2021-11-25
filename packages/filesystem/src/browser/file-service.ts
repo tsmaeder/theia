@@ -873,6 +873,8 @@ export class FileService {
     }
 
     async readFile(resource: URI, options?: ReadFileOptions): Promise<FileContent> {
+
+        const before = Date.now();
         const provider = await this.withReadProvider(resource);
 
         const stream = await this.doReadAsFileStream(provider, resource, {
@@ -885,10 +887,12 @@ export class FileService {
             preferUnbuffered: true
         });
 
-        return {
+        const result = {
             ...stream,
             value: await BinaryBufferReadableStream.toBuffer(stream.value)
         };
+        console.log(`readFile took ${Date.now() - before}ms`);
+        return result;
     }
 
     async readFileStream(resource: URI, options?: ReadFileOptions): Promise<FileStreamContent> {
