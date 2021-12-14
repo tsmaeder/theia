@@ -26,7 +26,8 @@ import {
     DebugAdapterSession
 } from './debug-model';
 import { DebugProtocol } from 'vscode-debugprotocol';
-import { Channel } from '../common/debug-service';
+import { Channel } from '@theia/core/lib/common/messaging/web-socket-channel';
+import { BinaryBuffer } from '@theia/core/lib/common/buffer';
 
 /**
  * [DebugAdapterSession](#DebugAdapterSession) implementation.
@@ -53,7 +54,7 @@ export class DebugAdapterSessionImpl implements DebugAdapterSession {
             throw new Error('The session has already been started, id: ' + this.id);
         }
         this.channel = channel;
-        this.channel.onMessage((message: string) => this.write(message));
+        this.channel.onMessage((message: Uint8Array) => this.write(BinaryBuffer.wrap(message).toString()));
         this.channel.onClose(() => this.channel = undefined);
 
     }
@@ -80,7 +81,7 @@ export class DebugAdapterSessionImpl implements DebugAdapterSession {
 
     protected send(message: string): void {
         if (this.channel) {
-            this.channel.send(message);
+            this.channel.send(BinaryBuffer.fromString(message).buffer);
         }
     }
 

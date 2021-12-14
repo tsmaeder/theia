@@ -510,7 +510,7 @@ export class HostedPluginSupport {
     }
 
     private createServerRpc(pluginHostId: string): RPCProtocol {
-        const emitter = new Emitter<string>();
+        const emitter = new Emitter<Uint8Array>();
         this.watcher.onPostMessageEvent(received => {
             if (pluginHostId === received.pluginHostId) {
                 emitter.fire(received.message);

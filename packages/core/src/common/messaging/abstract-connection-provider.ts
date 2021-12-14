@@ -15,7 +15,6 @@
  ********************************************************************************/
 
 import { injectable, interfaces } from 'inversify';
-import { ConsoleLogger, createWebSocketConnection, Logger } from 'vscode-ws-jsonrpc';
 import { Emitter, Event } from '../event';
 import { ConnectionHandler } from './handler';
 import { JsonRpcProxy, JsonRpcProxyFactory } from './proxy-factory';
@@ -80,9 +79,7 @@ export abstract class AbstractConnectionProvider<AbstractOptions extends object>
      */
     listen(handler: ConnectionHandler, options?: AbstractOptions): void {
         this.openChannel(handler.path, channel => {
-            const connection = createWebSocketConnection(channel, this.createLogger());
-            connection.onDispose(() => channel.close());
-            handler.onConnection(connection);
+            handler.onConnection(channel);
         }, options);
     }
 
@@ -106,8 +103,8 @@ export abstract class AbstractConnectionProvider<AbstractOptions extends object>
 
     protected abstract createChannel(id: number): WebSocketChannel;
 
-    protected handleIncomingRawMessage(data: string): void {
-        const message: WebSocketChannel.Message = JSON.parse(data);
+    protected handleIncomingRawMessage(data: Uint8Array): void {
+        const message: WebSocketChannel.Message = WebSocketChannel.parse(data);
         const channel = this.channels.get(message.id);
         if (channel) {
             channel.handleMessage(message);
@@ -116,9 +113,4 @@ export abstract class AbstractConnectionProvider<AbstractOptions extends object>
         }
         this.onIncomingMessageActivityEmitter.fire(undefined);
     }
-
-    protected createLogger(): Logger {
-        return new ConsoleLogger();
-    }
-
 }

@@ -26,8 +26,6 @@ import { terminalsPath } from '../common/terminal-protocol';
 import { IBaseTerminalServer, TerminalProcessInfo } from '../common/base-terminal-protocol';
 import { TerminalWatcher } from '../common/terminal-watcher';
 import { TerminalWidgetOptions, TerminalWidget, TerminalDimensions } from './base/terminal-widget';
-import { MessageConnection } from '@theia/core/shared/vscode-ws-jsonrpc';
-import { Deferred } from '@theia/core/lib/common/promise-util';
 import { TerminalPreferences, TerminalRendererType, isTerminalRendererType, DEFAULT_TERMINAL_RENDERER_TYPE, CursorStyle } from './terminal-preferences';
 import { TerminalContribution } from './terminal-contribution';
 import URI from '@theia/core/lib/common/uri';
@@ -58,7 +56,6 @@ export class TerminalWidgetImpl extends TerminalWidget implements StatefulWidget
     protected searchBox: TerminalSearchWidget;
     protected restored = false;
     protected closeOnDispose = true;
-    protected waitForConnection: Deferred<MessageConnection> | undefined;
     protected hoverMessage: HTMLDivElement;
     protected lastTouchEnd: TouchEvent | undefined;
     protected isAttachedCloseListener: boolean = false;
@@ -500,30 +497,10 @@ export class TerminalWidgetImpl extends TerminalWidget implements StatefulWidget
         }
         this.toDisposeOnConnect.dispose();
         this.toDispose.push(this.toDisposeOnConnect);
-        const waitForConnection = this.waitForConnection = new Deferred<MessageConnection>();
         this.webSocketConnectionProvider.listen({
             path: `${terminalsPath}/${this.terminalId}`,
             onConnection: connection => {
-                connection.onNotification('onData', (data: string) => this.write(data));
 
-                // Excludes the device status code emitted by Xterm.js
-                const sendData = (data?: string) => {
-                    if (data && !this.deviceStatusCodes.has(data) && !this.disableEnterWhenAttachCloseListener()) {
-                        return connection.sendRequest('write', data);
-                    }
-                };
-
-                const disposable = new DisposableCollection();
-                disposable.push(this.term.onData(sendData));
-                disposable.push(this.term.onBinary(sendData));
-
-                connection.onDispose(() => disposable.dispose());
-
-                this.toDisposeOnConnect.push(connection);
-                connection.listen();
-                if (waitForConnection) {
-                    waitForConnection.resolve(connection);
-                }
             }
         }, { reconnecting: false });
     }
@@ -570,11 +547,6 @@ export class TerminalWidgetImpl extends TerminalWidget implements StatefulWidget
     }
 
     sendText(text: string): void {
-        if (this.waitForConnection) {
-            this.waitForConnection.promise.then(connection =>
-                connection.sendRequest('write', text)
-            );
-        }
     }
 
     async executeCommand(commandOptions: CommandLineOptions): Promise<void> {
@@ -721,9 +693,5 @@ export class TerminalWidgetImpl extends TerminalWidget implements StatefulWidget
                 this.isAttachedCloseListener = false;
             });
         }
-    }
-
-    private disableEnterWhenAttachCloseListener(): boolean {
-        return this.isAttachedCloseListener;
     }
 }

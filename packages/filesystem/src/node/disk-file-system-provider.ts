@@ -259,8 +259,9 @@ export class DiskFileSystemProvider implements Disposable,
         const before = Date.now();
         try {
             const filePath = this.toFilePath(resource);
+            const result: Buffer = await promisify(readFile)(filePath);
 
-            return await promisify(readFile)(filePath);
+            return result;
         } catch (error) {
             throw this.toFileSystemProviderError(error);
         } finally {

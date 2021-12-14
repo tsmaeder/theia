@@ -42,16 +42,16 @@ const ctx = self as any;
 const pluginsApiImpl = new Map<string, typeof theia>();
 const pluginsModulesNames = new Map<string, Plugin>();
 
-const emitter = new Emitter<string>();
+const emitter = new Emitter<Uint8Array>();
 const rpc = new RPCProtocolImpl({
     onMessage: emitter.event,
-    send: (m: string) => {
+    send: (m: Uint8Array) => {
         ctx.postMessage(m);
     },
 },
-{
-    reviver: reviver
-});
+    {
+        reviver: reviver
+    });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 addEventListener('message', (message: any) => {

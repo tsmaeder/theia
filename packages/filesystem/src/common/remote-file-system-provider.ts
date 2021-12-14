@@ -31,7 +31,6 @@ import { Deferred } from '@theia/core/lib/common/promise-util';
 import type { TextDocumentContentChangeEvent } from '@theia/core/shared/vscode-languageserver-protocol';
 import { newWriteableStream, ReadableStreamEvents } from '@theia/core/lib/common/stream';
 import { CancellationToken, cancelled } from '@theia/core/lib/common/cancellation';
-import { Base64 } from '@theia/core/lib/common/base64';
 
 export const remoteFileSystemPath = '/services/remote-filesystem';
 
@@ -43,9 +42,9 @@ export interface RemoteFileSystemServer extends JsonRpcServer<RemoteFileSystemCl
     fsPath(resource: string): Promise<string>;
     open(resource: string, opts: FileOpenOptions): Promise<number>;
     close(fd: number): Promise<void>;
-    read(fd: number, pos: number, length: number): Promise<{ bytes: string; bytesRead: number; }>;
+    read(fd: number, pos: number, length: number): Promise<{ bytes: Uint8Array; bytesRead: number; }>;
     readFileStream(resource: string, opts: FileReadStreamOptions, token: CancellationToken): Promise<number>;
-    readFile(resource: string): Promise<string>;
+    readFile(resource: string): Promise<Uint8Array>;
     write(fd: number, pos: number, data: number[], offset: number, length: number): Promise<number>;
     writeFile(resource: string, content: number[], opts: FileWriteOptions): Promise<void>;
     delete(resource: string, opts: FileDeleteOptions): Promise<void>;
@@ -213,20 +212,18 @@ export class RemoteFileSystemProvider implements Required<FileSystemProvider>, D
 
     async read(fd: number, pos: number, data: Uint8Array, offset: number, length: number): Promise<number> {
         const { bytes, bytesRead } = await this.server.read(fd, pos, length);
-        const buffer = BinaryBuffer.fromString(bytes).buffer;
 
         // copy back the data that was written into the buffer on the remote
         // side. we need to do this because buffers are not referenced by
         // pointer, but only by value and as such cannot be directly written
         // to from the other process.
-        data.set(buffer.slice(0, bytesRead), offset);
+        data.set(bytes.slice(0, bytesRead), offset);
 
         return bytesRead;
     }
 
     async readFile(resource: URI): Promise<Uint8Array> {
-        const bytes = await this.server.readFile(resource.toString());
-        return Base64.decode(bytes);
+        return this.server.readFile(resource.toString());
     }
 
     readFileStream(resource: URI, opts: FileReadStreamOptions, token: CancellationToken): ReadableStreamEvents<Uint8Array> {
@@ -414,12 +411,12 @@ export class FileSystemProviderServer implements RemoteFileSystemServer {
         throw new Error('not supported');
     }
 
-    async read(fd: number, pos: number, length: number): Promise<{ bytes: string; bytesRead: number; }> {
+    async read(fd: number, pos: number, length: number): Promise<{ bytes: Uint8Array; bytesRead: number; }> {
         if (hasOpenReadWriteCloseCapability(this.provider)) {
             const buffer = BinaryBuffer.alloc(this.BUFFER_SIZE);
             const bytes = buffer.buffer;
             const bytesRead = await this.provider.read(fd, pos, bytes, 0, length);
-            return { bytes: Base64.encode(bytes), bytesRead };
+            return { bytes, bytesRead };
         }
         throw new Error('not supported');
     }
@@ -431,15 +428,13 @@ export class FileSystemProviderServer implements RemoteFileSystemServer {
         throw new Error('not supported');
     }
 
-    async readFile(resource: string): Promise<string> {
+    async readFile(resource: string): Promise<Uint8Array> {
         if (hasReadWriteCapability(this.provider)) {
             const before = Date.now();
             const buffer = await this.provider.readFile(new URI(resource));
             const afterRead = Date.now();
-            const encoded = Base64.encode(buffer);
-            const after = Date.now();
-            console.log(`readFileRemote: read= ${afterRead - before}, encode= ${after - afterRead}, total=${after - before}`)
-            return encoded;
+            console.log(`readFileRemote: read= ${afterRead - before}`);
+            return buffer;
         }
         throw new Error('not supported');
     }

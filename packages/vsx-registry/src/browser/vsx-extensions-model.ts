@@ -159,10 +159,6 @@ export class VSXExtensionsModel {
 
     protected searchCancellationTokenSource = new CancellationTokenSource();
     protected updateSearchResult = debounce(() => {
-        this.searchCancellationTokenSource.cancel();
-        this.searchCancellationTokenSource = new CancellationTokenSource();
-        const query = this.search.query;
-        return this.doUpdateSearchResult({ query, includeAllVersions: true }, this.searchCancellationTokenSource.token);
     }, 150);
     protected doUpdateSearchResult(param: VSXSearchParam, token: CancellationToken): Promise<void> {
         return this.doChange(async () => {

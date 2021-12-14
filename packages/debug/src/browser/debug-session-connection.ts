@@ -20,8 +20,8 @@ import { DebugProtocol } from 'vscode-debugprotocol';
 import { Deferred } from '@theia/core/lib/common/promise-util';
 import { Event, Emitter, DisposableCollection, Disposable, MaybePromise } from '@theia/core';
 import { OutputChannel } from '@theia/output/lib/browser/output-channel';
-
-import { Channel } from '../common/debug-service';
+import { Channel } from '@theia/core/lib/common/messaging/web-socket-channel';
+import { BinaryBuffer } from '@theia/core/lib/common/buffer';
 
 export type DebugRequestHandler = (request: DebugProtocol.Request) => MaybePromise<any>;
 
@@ -168,7 +168,7 @@ export class DebugSessionConnection implements Disposable {
             this.cancelPendingRequests();
             this.onDidCloseEmitter.fire();
         });
-        connection.onMessage(data => this.handleMessage(data));
+        connection.onMessage(data => this.handleMessage(BinaryBuffer.wrap(data).toString()));
         return connection;
     }
 
@@ -247,7 +247,8 @@ export class DebugSessionConnection implements Disposable {
             const dateStr = `${now.toLocaleString(undefined, { hour12: false })}.${now.getMilliseconds()}`;
             this.traceOutputChannel.appendLine(`${this.sessionId.substring(0, 8)} ${dateStr} theia -> adapter: ${JSON.stringify(message, undefined, 4)}`);
         }
-        connection.send(messageStr);
+
+        connection.send(BinaryBuffer.fromString(messageStr).buffer);
     }
 
     protected handleMessage(data: string): void {

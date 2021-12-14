@@ -15,9 +15,10 @@
  ********************************************************************************/
 
 import { Emitter } from '@theia/core/lib/common/event';
-import { RPCProtocolImpl, MessageType, ConnectionClosedError } from '../../common/rpc-protocol';
+import { RPCProtocolImpl, ConnectionClosedError } from '../../common/rpc-protocol';
 import { PluginHostRPC } from './plugin-host-rpc';
 import { reviver } from '../../plugin/types-impl';
+import { Base64 } from '@theia/core/lib/common/base64';
 
 console.log('PLUGIN_HOST(' + process.pid + ') starting instance');
 
@@ -52,7 +53,7 @@ process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
         if (index >= 0) {
             promise.catch(err => {
                 unhandledPromises.splice(index, 1);
-                if (terminating && (ConnectionClosedError.is(err) || ConnectionClosedError.is(reason))) {
+                if ((ConnectionClosedError.is(err) || ConnectionClosedError.is(reason))) {
                     // during termination it is expected that pending rpc request are rejected
                     return;
                 }
@@ -73,47 +74,21 @@ process.on('rejectionHandled', (promise: Promise<any>) => {
     }
 });
 
-let terminating = false;
-const emitter = new Emitter<string>();
+const emitter = new Emitter<Uint8Array>();
 const rpc = new RPCProtocolImpl({
     onMessage: emitter.event,
-    send: (m: string) => {
-        if (process.send && !terminating) {
-            process.send(m);
+    send: (m: Uint8Array) => {
+        if (process.send) {
+            process.send(Base64.encode(m));
         }
     }
 },
-{
-    reviver: reviver
-});
+    {
+        reviver: reviver
+    });
 
 process.on('message', async (message: string) => {
-    if (terminating) {
-        return;
-    }
-    try {
-        const msg = JSON.parse(message);
-        if ('type' in msg && msg.type === MessageType.Terminate) {
-            terminating = true;
-            emitter.dispose();
-            if ('stopTimeout' in msg && typeof msg.stopTimeout === 'number' && msg.stopTimeout) {
-                await Promise.race([
-                    pluginHostRPC.terminate(),
-                    new Promise(resolve => setTimeout(resolve, msg.stopTimeout))
-                ]);
-            } else {
-                await pluginHostRPC.terminate();
-            }
-            rpc.dispose();
-            if (process.send) {
-                process.send(JSON.stringify({ type: MessageType.Terminated }));
-            }
-        } else {
-            emitter.fire(message);
-        }
-    } catch (e) {
-        console.error(e);
-    }
+    emitter.fire(Base64.decode(message));
 });
 
 const pluginHostRPC = new PluginHostRPC(rpc);

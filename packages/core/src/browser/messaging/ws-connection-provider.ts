@@ -104,7 +104,10 @@ export class WebSocketConnectionProvider extends AbstractConnectionProvider<WebS
             this.fireSocketDidClose();
         };
         socket.onmessage = ({ data }) => {
-            this.handleIncomingRawMessage(data);
+            const asBlob: Blob = data;
+            asBlob.arrayBuffer().then(buffer => {
+                this.handleIncomingRawMessage(new Uint8Array(buffer));
+            });
         };
         this.socket = socket;
         window.addEventListener('offline', () => this.tryReconnect());
@@ -145,14 +148,7 @@ export class WebSocketConnectionProvider extends AbstractConnectionProvider<WebS
                 if (this.httpFallbackDisconnected) {
                     this.fireSocketDidOpen();
                 }
-                const json: string[] = await response.json();
-                if (Array.isArray(json)) {
-                    for (const item of json) {
-                        this.handleIncomingRawMessage(item);
-                    }
-                } else {
-                    throw new Error('Received invalid long polling response.');
-                }
+                this.handleIncomingRawMessage(new Uint8Array(await response.arrayBuffer()));
             } else {
                 timeoutDuration = this.httpFallbackOptions?.errorTimeout || 0;
                 this.httpFallbackDisconnected = true;
@@ -218,7 +214,7 @@ export class WebSocketConnectionProvider extends AbstractConnectionProvider<WebS
             reconnectionDelayGrowFactor: 1.3,
             connectionTimeout: 10000,
             maxRetries: Infinity,
-            debug: false
+            debug: false,
         });
     }
 

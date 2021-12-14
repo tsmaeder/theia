@@ -36,7 +36,7 @@ export class ElectronIpcConnectionProvider extends AbstractConnectionProvider<El
 
     constructor() {
         super();
-        ipcRenderer.on(THEIA_ELECTRON_IPC_CHANNEL_NAME, (event: ElectronEvent, data: string) => {
+        ipcRenderer.on(THEIA_ELECTRON_IPC_CHANNEL_NAME, (event: ElectronEvent, data: Uint8Array) => {
             this.handleIncomingRawMessage(data);
         });
     }

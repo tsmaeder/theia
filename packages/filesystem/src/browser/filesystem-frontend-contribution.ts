@@ -142,7 +142,6 @@ export class FileSystemFrontendContribution implements FrontendApplicationContri
             message.push(i % 255);
         }
 
-
         commands.registerCommand(FileSystemCommands.TEST, {
             execute: async () => {
                 const before = Date.now();

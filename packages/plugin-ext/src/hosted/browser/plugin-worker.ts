@@ -25,7 +25,7 @@ export class PluginWorker {
     public readonly rpc: RPCProtocol;
 
     constructor() {
-        const emitter = new Emitter<string>();
+        const emitter = new Emitter<Uint8Array>();
 
         this.worker = new Worker(new URL('./worker/worker-main',
             // @ts-expect-error (TS1343)
@@ -37,7 +37,7 @@ export class PluginWorker {
 
         this.rpc = new RPCProtocolImpl({
             onMessage: emitter.event,
-            send: (m: string) => {
+            send: (m: Uint8Array) => {
                 this.worker.postMessage(m);
             }
         });

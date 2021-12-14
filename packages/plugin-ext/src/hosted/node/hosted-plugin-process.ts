@@ -19,11 +19,10 @@ import { injectable, inject, named } from '@theia/core/shared/inversify';
 import { ILogger, ConnectionErrorHandler, ContributionProvider, MessageService } from '@theia/core/lib/common';
 import { createIpcEnv } from '@theia/core/lib/node/messaging/ipc-protocol';
 import { HostedPluginClient, ServerPluginRunner, PluginHostEnvironmentVariable, DeployedPlugin, PLUGIN_HOST_BACKEND } from '../../common/plugin-protocol';
-import { MessageType } from '../../common/rpc-protocol';
 import { HostedPluginCliContribution } from './hosted-plugin-cli-contribution';
 import * as psTree from 'ps-tree';
-import { Deferred } from '@theia/core/lib/common/promise-util';
 import { HostedPluginLocalizationService } from './hosted-plugin-localization-service';
+import { Base64 } from '@theia/core/lib/common/base64';
 
 export interface IPCConnectionOptions {
     readonly serverName: string;
@@ -82,14 +81,14 @@ export class HostedPluginProcess implements ServerPluginRunner {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    public acceptMessage(pluginHostId: string, message: string): boolean {
+    public acceptMessage(pluginHostId: string, message: Uint8Array): boolean {
         return pluginHostId === 'main';
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    public onMessage(pluginHostId: string, jsonMessage: string): void {
+    public onMessage(pluginHostId: string, jsonMessage: Uint8Array): void {
         if (this.childProcess) {
-            this.childProcess.send(jsonMessage);
+            this.childProcess.send(Base64.encode(jsonMessage));
         }
     }
 
@@ -102,26 +101,6 @@ export class HostedPluginProcess implements ServerPluginRunner {
         // eslint-disable-next-line @typescript-eslint/no-shadow
         const cp = this.childProcess;
         this.childProcess = undefined;
-
-        const waitForTerminated = new Deferred<void>();
-        cp.on('message', message => {
-            const msg = JSON.parse(message);
-            if ('type' in msg && msg.type === MessageType.Terminated) {
-                waitForTerminated.resolve();
-            }
-        });
-        const stopTimeout = this.cli.pluginHostStopTimeout;
-        cp.send(JSON.stringify({ type: MessageType.Terminate, stopTimeout }));
-
-        const terminateTimeout = this.cli.pluginHostTerminateTimeout;
-        if (terminateTimeout) {
-            await Promise.race([
-                waitForTerminated.promise,
-                new Promise(resolve => setTimeout(resolve, terminateTimeout))
-            ]);
-        } else {
-            await waitForTerminated.promise;
-        }
 
         this.killProcessTree(cp.pid);
     }
@@ -158,7 +137,7 @@ export class HostedPluginProcess implements ServerPluginRunner {
         });
         this.childProcess.on('message', message => {
             if (this.client) {
-                this.client.postMessage(PLUGIN_HOST_BACKEND, message);
+                this.client.postMessage(PLUGIN_HOST_BACKEND, Base64.decode(message));
             }
         });
     }

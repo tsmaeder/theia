@@ -16,11 +16,14 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { MessageConnection, ResponseError } from 'vscode-ws-jsonrpc';
+import { ResponseError } from 'vscode-ws-jsonrpc';
 import { ApplicationError } from '../application-error';
 import { Event, Emitter } from '../event';
 import { Disposable } from '../disposable';
 import { ConnectionHandler } from './handler';
+import { WebSocketChannel } from './web-socket-channel';
+import { RpcProtocol, RPCProtocolImpl } from './rpc-protocol';
+import { Deferred } from '../promise-util';
 
 export type JsonRpcServer<Client> = Disposable & {
     /**
@@ -45,7 +48,7 @@ export class JsonRpcConnectionHandler<T extends object> implements ConnectionHan
         readonly factoryConstructor: new () => JsonRpcProxyFactory<T> = JsonRpcProxyFactory
     ) { }
 
-    onConnection(connection: MessageConnection): void {
+    onConnection(connection: WebSocketChannel): void {
         const factory = new this.factoryConstructor();
         const proxy = factory.createProxy();
         factory.target = this.targetFactory(proxy);
@@ -100,8 +103,7 @@ export class JsonRpcProxyFactory<T extends object> implements ProxyHandler<T> {
     protected readonly onDidOpenConnectionEmitter = new Emitter<void>();
     protected readonly onDidCloseConnectionEmitter = new Emitter<void>();
 
-    protected connectionPromiseResolve: (connection: MessageConnection) => void;
-    protected connectionPromise: Promise<MessageConnection>;
+    protected connection: Deferred<RpcProtocol> = new Deferred();
 
     /**
      * Build a new JsonRpcProxyFactory.
@@ -110,19 +112,6 @@ export class JsonRpcProxyFactory<T extends object> implements ProxyHandler<T> {
      *   is omitted, the proxy won't be able to handle requests, only send them.
      */
     constructor(public target?: any) {
-        this.waitForConnection();
-    }
-
-    protected waitForConnection(): void {
-        this.connectionPromise = new Promise(resolve =>
-            this.connectionPromiseResolve = resolve
-        );
-        this.connectionPromise.then(connection => {
-            connection.onClose(() =>
-                this.onDidCloseConnectionEmitter.fire(undefined)
-            );
-            this.onDidOpenConnectionEmitter.fire(undefined);
-        });
     }
 
     /**
@@ -131,12 +120,16 @@ export class JsonRpcProxyFactory<T extends object> implements ProxyHandler<T> {
      * This connection will be used to send/receive JSON-RPC requests and
      * response.
      */
-    listen(connection: MessageConnection): void {
-        connection.onRequest((prop, ...args) => this.onRequest(prop, ...args));
-        connection.onNotification((prop, ...args) => this.onNotification(prop, ...args));
-        connection.onDispose(() => this.waitForConnection());
-        connection.listen();
-        this.connectionPromiseResolve(connection);
+    listen(connection: WebSocketChannel): void {
+        const requestHandler = (method: string, args: any[]) => this.onRequest(method, ...args);
+        const protocol = new RPCProtocolImpl(connection, requestHandler);
+        protocol.onNotification(({ method, args }) => this.onNotification(method, ...args));
+        connection.onClose(() => {
+            this.connection = new Deferred();
+            this.onDidCloseConnectionEmitter.fire();
+        });
+        this.onDidOpenConnectionEmitter.fire();
+        this.connection.resolve(protocol);
     }
 
     /**
@@ -235,17 +228,26 @@ export class JsonRpcProxyFactory<T extends object> implements ProxyHandler<T> {
         return (...args: any[]) => {
             const method = p.toString();
             const capturedError = new Error(`Request '${method}' failed`);
-            return this.connectionPromise.then(connection =>
+            return this.connection.promise.then(connection =>
                 new Promise((resolve, reject) => {
                     try {
                         if (isNotify) {
-                            connection.sendNotification(method, ...args);
+                            // console.info(`Send notification ${method}`);
+                            connection.sendNotification(method, args);
                             resolve(undefined);
                         } else {
-                            const resultPromise = connection.sendRequest(method, ...args) as Promise<any>;
+                            // console.info(`Send request ${method}`);
+                            const resultPromise = connection.sendRequest(method, args) as Promise<any>;
                             resultPromise
-                                .catch((err: any) => reject(this.deserializeError(capturedError, err)))
-                                .then((result: any) => resolve(result));
+                                .catch((err: any) => {
+                                    // console.info(`request failed: ${method}`);
+
+                                    reject(this.deserializeError(capturedError, err));
+                                })
+                                .then((result: any) => {
+                                    // console.info(`request succeeded: ${method}`);
+                                    resolve(result);
+                                });
                         }
                     } catch (err) {
                         reject(err);

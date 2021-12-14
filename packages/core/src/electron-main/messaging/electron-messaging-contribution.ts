@@ -16,12 +16,9 @@
 
 import { IpcMainEvent, ipcMain, WebContents } from '../../../shared/electron';
 import { inject, injectable, named, postConstruct } from 'inversify';
-import { MessageConnection } from 'vscode-ws-jsonrpc';
-import { createWebSocketConnection } from 'vscode-ws-jsonrpc/lib/socket/connection';
 import { ContributionProvider } from '../../common/contribution-provider';
 import { WebSocketChannel } from '../../common/messaging/web-socket-channel';
 import { MessagingContribution } from '../../node/messaging/messaging-contribution';
-import { ConsoleLogger } from '../../node/messaging/logger';
 import { ElectronConnectionHandler, THEIA_ELECTRON_IPC_CHANNEL_NAME } from '../../electron-common/messaging/electron-connection-handler';
 import { ElectronMainApplicationContribution } from '../electron-main-application';
 import { ElectronMessagingService } from './electron-messaging-service';
@@ -59,16 +56,14 @@ export class ElectronMessagingContribution implements ElectronMainApplicationCon
         }
         for (const connectionHandler of this.connectionHandlers.getContributions()) {
             this.channelHandlers.push(connectionHandler.path, (params, channel) => {
-                const connection = createWebSocketConnection(channel, new ConsoleLogger());
-                connectionHandler.onConnection(connection);
+                connectionHandler.onConnection(channel);
             });
         }
     }
 
-    listen(spec: string, callback: (params: ElectronMessagingService.PathParams, connection: MessageConnection) => void): void {
+    listen(spec: string, callback: (params: ElectronMessagingService.PathParams, connection: WebSocketChannel) => void): void {
         this.ipcChannel(spec, (params, channel) => {
-            const connection = createWebSocketConnection(channel, new ConsoleLogger());
-            callback(params, connection);
+            callback(params, channel);
         });
     }
 

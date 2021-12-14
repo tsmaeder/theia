@@ -16,20 +16,38 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { IWebSocket } from 'vscode-ws-jsonrpc/lib/socket/socket';
+import { Event } from '..';
+import { BinaryBuffer } from '../buffer';
 import { Disposable, DisposableCollection } from '../disposable';
 import { Emitter } from '../event';
+import { MessageWriter, MessageReader } from './rpc-protocol';
 
-export class WebSocketChannel implements IWebSocket {
+/**
+ * A closeable channel to send messages over with error/close handling
+ */
+export interface Channel {
+    send(content: Uint8Array): void;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onMessage: Event<Uint8Array>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onError: Event<any>
+    onClose: Event<void>;
+    close(): void;
+}
+
+export class WebSocketChannel implements Channel {
 
     static wsPath = '/services';
 
-    protected readonly closeEmitter = new Emitter<[number, string]>();
+    protected readonly closeEmitter = new Emitter<void>();
+    protected readonly errorEmitter = new Emitter<any>();
     protected readonly toDispose = new DisposableCollection(this.closeEmitter);
+
+    protected readonly messageEmitter = new Emitter<Uint8Array>();
 
     constructor(
         readonly id: number,
-        protected readonly doSend: (content: string) => void
+        protected readonly doSend: (content: Uint8Array) => void
     ) { }
 
     dispose(): void {
@@ -46,7 +64,7 @@ export class WebSocketChannel implements IWebSocket {
         if (message.kind === 'ready') {
             this.fireOpen();
         } else if (message.kind === 'data') {
-            this.fireMessage(message.content);
+            this.messageEmitter.fire(message.content);
         } else if (message.kind === 'close') {
             this.fireClose(message.code, message.reason);
         }
@@ -54,28 +72,28 @@ export class WebSocketChannel implements IWebSocket {
 
     open(path: string): void {
         this.checkNotDisposed();
-        this.doSend(JSON.stringify(<WebSocketChannel.OpenMessage>{
-            kind: 'open',
-            id: this.id,
-            path
-        }));
+        const buf = new MessageWriter(() => { });
+        buf.writeString('open');
+        buf.writeUint32(this.id);
+        buf.writeString(path);
+        this.doSend(buf.toMessage());
     }
 
     ready(): void {
         this.checkNotDisposed();
-        this.doSend(JSON.stringify(<WebSocketChannel.ReadyMessage>{
-            kind: 'ready',
-            id: this.id
-        }));
+        const buf = new MessageWriter(() => { });
+        buf.writeString('ready');
+        buf.writeUint32(this.id);
+        this.doSend(buf.toMessage());
     }
 
-    send(content: string): void {
+    send(content: Uint8Array): void {
         this.checkNotDisposed();
-        this.doSend(JSON.stringify(<WebSocketChannel.DataMessage>{
-            kind: 'data',
-            id: this.id,
-            content
-        }));
+        const buf = new MessageWriter(() => { });
+        buf.writeString('data');
+        buf.writeUint32(this.id);
+        buf.writeByteArray(content);
+        this.doSend(buf.toMessage());
     }
 
     close(code: number = 1000, reason: string = ''): void {
@@ -84,13 +102,18 @@ export class WebSocketChannel implements IWebSocket {
             return;
         }
         this.checkNotDisposed();
-        this.doSend(JSON.stringify(<WebSocketChannel.CloseMessage>{
-            kind: 'close',
-            id: this.id,
-            code,
-            reason
-        }));
+        const buf = new MessageWriter(() => { });
+        buf.writeString('close');
+        buf.writeUint32(this.id);
+        buf.writeUint32(code);
+        buf.writeString(reason);
+        this.doSend(buf.toMessage());
+
         this.fireClose(code, reason);
+    }
+
+    fireError(err: any): void {
+        this.errorEmitter.fire(err);
     }
 
     tryClose(code: number = 1000, reason: string = ''): void {
@@ -98,12 +121,14 @@ export class WebSocketChannel implements IWebSocket {
             // Do not try to close the channel if it is already closing or disposed.
             return;
         }
-        this.doSend(JSON.stringify(<WebSocketChannel.CloseMessage>{
-            kind: 'close',
-            id: this.id,
-            code,
-            reason
-        }));
+        this.checkNotDisposed();
+        const buf = new MessageWriter(() => { });
+        buf.writeString('close');
+        buf.writeUint32(this.id);
+        buf.writeUint32(code);
+        buf.writeString(reason);
+        this.doSend(buf.toMessage());
+
         this.fireClose(code, reason);
     }
 
@@ -114,18 +139,12 @@ export class WebSocketChannel implements IWebSocket {
         this.toDispose.push(Disposable.create(() => this.fireOpen = () => { }));
     }
 
-    protected fireMessage: (data: any) => void = () => { };
-    onMessage(cb: (data: any) => void): void {
-        this.checkNotDisposed();
-        this.fireMessage = cb;
-        this.toDispose.push(Disposable.create(() => this.fireMessage = () => { }));
+    get onMessage(): Event<Uint8Array> {
+        return this.messageEmitter.event;
     }
 
-    fireError: (reason: any) => void = () => { };
-    onError(cb: (reason: any) => void): void {
-        this.checkNotDisposed();
-        this.fireError = cb;
-        this.toDispose.push(Disposable.create(() => this.fireError = () => { }));
+    get onError(): Event<any> {
+        return this.errorEmitter.event;
     }
 
     protected closing = false;
@@ -135,15 +154,14 @@ export class WebSocketChannel implements IWebSocket {
         }
         this.closing = true;
         try {
-            this.closeEmitter.fire([code, reason]);
+            this.closeEmitter.fire();
         } finally {
             this.closing = false;
         }
         this.dispose();
     }
-    onClose(cb: (code: number, reason: string) => void): Disposable {
-        this.checkNotDisposed();
-        return this.closeEmitter.event(([code, reason]) => cb(code, reason));
+    get onClose(): Event<void> {
+        return this.closeEmitter.event;
     }
 
 }
@@ -160,7 +178,7 @@ export namespace WebSocketChannel {
     export interface DataMessage {
         kind: 'data'
         id: number
-        content: string
+        content: Uint8Array
     }
     export interface CloseMessage {
         kind: 'close'
@@ -169,4 +187,46 @@ export namespace WebSocketChannel {
         reason: string
     }
     export type Message = OpenMessage | ReadyMessage | DataMessage | CloseMessage;
+
+    export function parse(buf: Uint8Array): Message {
+        const reader = new MessageReader(o => o, BinaryBuffer.wrap(buf));
+        const type = reader.readString();
+        const id = reader.readUint32();
+        switch (type) {
+            case 'open': {
+                const path = reader.readString();
+                return {
+                    kind: type,
+                    id: id,
+                    path: path
+                };
+            }
+            case 'ready': {
+                return {
+                    kind: type,
+                    id: id
+                };
+            }
+            case 'close': {
+                const code = reader.readUint32();
+                const reason = reader.readString();
+
+                return {
+                    kind: type,
+                    id: id,
+                    code: code,
+                    reason: reason
+                };
+            }
+            case 'data': {
+                const data = reader.readByteArray();
+                return {
+                    kind: type,
+                    id: id,
+                    content: data
+                };
+            }
+        }
+        throw new Error(`Unknown message type read: ${type}`);
+    }
 }

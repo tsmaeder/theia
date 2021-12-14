@@ -19,6 +19,7 @@ import { ILogger } from '@theia/core/lib/common';
 import { TerminalProcess, ProcessManager } from '@theia/process/lib/node';
 import { terminalsPath } from '../common/terminal-protocol';
 import { MessagingService } from '@theia/core/lib/node/messaging/messaging-service';
+import { RPCProtocolImpl } from '@theia/core/lib/common/messaging/rpc-protocol';
 
 @injectable()
 export class TerminalBackendContribution implements MessagingService.Contribution {
@@ -35,10 +36,13 @@ export class TerminalBackendContribution implements MessagingService.Contributio
             const termProcess = this.processManager.get(id);
             if (termProcess instanceof TerminalProcess) {
                 const output = termProcess.createOutputStream();
-                output.on('data', data => connection.sendNotification('onData', data.toString()));
-                connection.onRequest('write', (data: string) => termProcess.write(data));
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const rpc = new RPCProtocolImpl(connection, ((method: string, args: any[]) => {
+                    termProcess.write(args[0]);
+                    return Promise.resolve();
+                }));
+                output.on('data', data => rpc.sendNotification('onData', [data.toString()]));
                 connection.onClose(() => output.dispose());
-                connection.listen();
             } else {
                 connection.dispose();
             }

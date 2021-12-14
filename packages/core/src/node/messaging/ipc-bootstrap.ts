@@ -15,21 +15,13 @@
  ********************************************************************************/
 
 import 'reflect-metadata';
+import { IPCConnectionProvider } from '.';
 import { dynamicRequire } from '../dynamic-require';
-import { ConsoleLogger } from 'vscode-ws-jsonrpc/lib/logger';
-import { createMessageConnection, IPCMessageReader, IPCMessageWriter, Trace } from 'vscode-ws-jsonrpc';
 import { checkParentAlive, IPCEntryPoint } from './ipc-protocol';
 
 checkParentAlive();
 
 const entryPoint = IPCEntryPoint.getScriptFromEnv();
-const reader = new IPCMessageReader(process);
-const writer = new IPCMessageWriter(process);
-const logger = new ConsoleLogger();
-const connection = createMessageConnection(reader, writer, logger);
-connection.trace(Trace.Off, {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    log: (message: any, data?: string) => console.log(message, data)
-});
 
-dynamicRequire<{ default: IPCEntryPoint }>(entryPoint).default(connection);
+
+dynamicRequire<{ default: IPCEntryPoint }>(entryPoint).default(IPCConnectionProvider.createConnection(process));

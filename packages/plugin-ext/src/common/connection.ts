@@ -13,15 +13,15 @@
  *
  * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
  ********************************************************************************/
-import { Channel } from '@theia/debug/lib/common/debug-service';
 import { ConnectionExt, ConnectionMain } from './plugin-api-rpc';
-import { Emitter } from '@theia/core/lib/common/event';
+import { Emitter, Event } from '@theia/core/lib/common/event';
+import { Channel } from '@theia/core/lib/common/messaging/web-socket-channel';
 
 /**
  * A channel communicating with a counterpart in a plugin host.
  */
 export class PluginChannel implements Channel {
-    private messageEmitter: Emitter<string> = new Emitter();
+    private messageEmitter: Emitter<Uint8Array> = new Emitter();
     private errorEmitter: Emitter<unknown> = new Emitter();
     private closedEmitter: Emitter<void> = new Emitter();
 
@@ -29,11 +29,11 @@ export class PluginChannel implements Channel {
         protected readonly id: string,
         protected readonly connection: ConnectionExt | ConnectionMain) { }
 
-    send(content: string): void {
+    send(content: Uint8Array): void {
         this.connection.$sendMessage(this.id, content);
     }
 
-    fireMessageReceived(msg: string): void {
+    fireMessageReceived(msg: Uint8Array): void {
         this.messageEmitter.fire(msg);
     }
 
@@ -45,18 +45,17 @@ export class PluginChannel implements Channel {
         this.closedEmitter.fire();
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    onMessage(cb: (data: any) => void): void {
-        this.messageEmitter.event(cb);
+    get onMessage(): Event<Uint8Array> {
+        return this.messageEmitter.event;
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    onError(cb: (reason: any) => void): void {
-        this.errorEmitter.event(cb);
+    get onError(): Event<unknown> {
+        return this.errorEmitter.event;
     }
 
-    onClose(cb: (code: number, reason: string) => void): void {
-        this.closedEmitter.event(() => cb(-1, 'closed'));
+    get onClose(): Event<void> {
+        return this.closedEmitter.event;
     }
 
     close(): void {
@@ -78,7 +77,7 @@ export class ConnectionImpl implements ConnectionMain, ConnectionExt {
      * @param id connection's id
      * @param message incoming message
      */
-    async $sendMessage(id: string, message: string): Promise<void> {
+    async $sendMessage(id: string, message: Uint8Array): Promise<void> {
         if (this.connections.has(id)) {
             this.connections.get(id)!.fireMessageReceived(message);
         } else {

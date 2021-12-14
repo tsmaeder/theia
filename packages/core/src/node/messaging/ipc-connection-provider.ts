@@ -17,9 +17,9 @@
 import * as cp from 'child_process';
 import * as path from 'path';
 import { injectable, inject } from 'inversify';
-import { Trace, IPCMessageReader, IPCMessageWriter, createMessageConnection, MessageConnection, Message } from 'vscode-ws-jsonrpc';
-import { ILogger, ConnectionErrorHandler, DisposableCollection, Disposable } from '../../common';
+import { ILogger, ConnectionErrorHandler, DisposableCollection, Disposable, Emitter } from '../../common';
 import { createIpcEnv } from './ipc-protocol';
+import { Channel, WebSocketChannel } from 'src/common/messaging/web-socket-channel';
 
 export interface ResolvedIPCConnectionOptions {
     readonly serverName: string
@@ -40,7 +40,7 @@ export class IPCConnectionProvider {
     @inject(ILogger)
     protected readonly logger: ILogger;
 
-    listen(options: IPCConnectionOptions, acceptor: (connection: MessageConnection) => void): Disposable {
+    listen(options: IPCConnectionOptions, acceptor: (connection: WebSocketChannel) => void): Disposable {
         return this.doListen({
             logger: this.logger,
             args: [],
@@ -48,19 +48,14 @@ export class IPCConnectionProvider {
         }, acceptor);
     }
 
-    protected doListen(options: ResolvedIPCConnectionOptions, acceptor: (connection: MessageConnection) => void): Disposable {
+    protected doListen(options: ResolvedIPCConnectionOptions, acceptor: (connection: Channel) => void): Disposable {
         const childProcess = this.fork(options);
-        const connection = this.createConnection(childProcess, options);
+        const channel = IPCConnectionProvider.createConnection(childProcess);
         const toStop = new DisposableCollection();
         const toCancelStop = toStop.push(Disposable.create(() => childProcess.kill()));
         const errorHandler = options.errorHandler;
         if (errorHandler) {
-            connection.onError((e: [Error, Message | undefined, number | undefined]) => {
-                if (errorHandler.shouldStop(e[0], e[1], e[2])) {
-                    toStop.dispose();
-                }
-            });
-            connection.onClose(() => {
+            channel.onClose(() => {
                 if (toStop.disposed) {
                     return;
                 }
@@ -70,25 +65,25 @@ export class IPCConnectionProvider {
                 }
             });
         }
-        acceptor(connection);
+        acceptor(channel);
         return toStop;
     }
 
-    protected createConnection(childProcess: cp.ChildProcess, options: ResolvedIPCConnectionOptions): MessageConnection {
-        const reader = new IPCMessageReader(childProcess);
-        const writer = new IPCMessageWriter(childProcess);
-        const connection = createMessageConnection(reader, writer, {
-            error: (message: string) => this.logger.error(`[${options.serverName}: ${childProcess.pid}] ${message}`),
-            warn: (message: string) => this.logger.warn(`[${options.serverName}: ${childProcess.pid}] ${message}`),
-            info: (message: string) => this.logger.info(`[${options.serverName}: ${childProcess.pid}] ${message}`),
-            log: (message: string) => this.logger.info(`[${options.serverName}: ${childProcess.pid}] ${message}`)
-        });
-        const traceVerbosity = this.logger.isDebug() ? Trace.Verbose : Trace.Off;
-        connection.trace(traceVerbosity, {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            log: (message: any, data?: string) => this.logger.debug(`[${options.serverName}: ${childProcess.pid}] ${message}` + (typeof data === 'string' ? ' ' + data : ''))
-        });
-        return connection;
+    static createConnection(childProcess: NodeJS.Process | cp.ChildProcess): Channel {
+        const messageEmitter = new Emitter<Uint8Array>();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const errorEmitter = new Emitter<any>();
+        const closeEmitter = new Emitter<void>();
+
+        childProcess.on('message', data => messageEmitter.fire(data));
+        childProcess.on('exit', () => closeEmitter.fire());
+        return {
+            send: data => childProcess.send!(data),
+            close: () => { },
+            onMessage: messageEmitter.event,
+            onClose: closeEmitter.event,
+            onError: errorEmitter.event
+        };
     }
 
     protected fork(options: ResolvedIPCConnectionOptions): cp.ChildProcess {

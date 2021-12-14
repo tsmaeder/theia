@@ -264,13 +264,13 @@ export interface OutputChannelRegistryExt {
 export interface ConnectionMain {
     $createConnection(id: string): Promise<void>;
     $deleteConnection(id: string): Promise<void>;
-    $sendMessage(id: string, message: string): void;
+    $sendMessage(id: string, message: Uint8Array): void;
 }
 
 export interface ConnectionExt {
     $createConnection(id: string): Promise<void>;
     $deleteConnection(id: string): Promise<void>
-    $sendMessage(id: string, message: string): void;
+    $sendMessage(id: string, message: Uint8Array): void;
 }
 
 export interface TerminalServiceMain {
@@ -1668,7 +1668,7 @@ export interface FileSystemMain {
 
     $stat(uri: UriComponents): Promise<files.Stat>;
     $readdir(resource: UriComponents): Promise<[string, files.FileType][]>;
-    $readFile(resource: UriComponents): Promise<BinaryBuffer>;
+    $readFile(resource: UriComponents): Promise<Uint8Array>;
     $writeFile(resource: UriComponents, content: BinaryBuffer): Promise<void>;
     $rename(resource: UriComponents, target: UriComponents, opts: files.FileOverwriteOptions): Promise<void>;
     $copy(resource: UriComponents, target: UriComponents, opts: files.FileOverwriteOptions): Promise<void>;

@@ -149,8 +149,13 @@ class ConsumerFileSystem implements vscode.FileSystem {
         return this._proxy.$mkdir(uri).catch(ConsumerFileSystem._handleError);
     }
     async readFile(uri: vscode.Uri): Promise<Uint8Array> {
-        return this._proxy.$readFile(uri).then(buff => buff.buffer).catch(ConsumerFileSystem._handleError);
+        const start = new Date().getTime();
+        const res = await this._proxy.$readFile(uri).then(buff => buff).catch(ConsumerFileSystem._handleError);
+        const end = new Date().getTime();
+        console.log(`Ext.readFile = ${end - start} ms`);
+        return res;
     }
+
     writeFile(uri: vscode.Uri, content: Uint8Array): Promise<void> {
         return this._proxy.$writeFile(uri, BinaryBuffer.wrap(content)).catch(ConsumerFileSystem._handleError);
     }
