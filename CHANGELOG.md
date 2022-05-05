@@ -8,6 +8,7 @@
 
 [1.25.0 Milestone](https://github.com/eclipse-theia/theia/milestone/35)
 
+Just a test of GH PR functionality
 - [callhierarchy] added handling to cache instances of `callhierarchy` providers [#10857](https://github.com/eclipse-theia/theia/pull/10857)
 - [core] added `property-view` API documentation [#11022](https://github.com/eclipse-theia/theia/pull/11022)
 - [core] added `selection-service` APIdocumentation [#11022](https://github.com/eclipse-theia/theia/pull/11022)
