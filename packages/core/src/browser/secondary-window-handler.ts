@@ -157,13 +157,16 @@ export class SecondaryWindowHandler {
 
                 await this.applicationShell.closeWidget(widget.id, closeOptions);
                 widget.isClosing = false;
+                if (widget.isDisposed) {
+                    const extIndex = this.secondaryWindows.indexOf(newWindow!);
+                    if (extIndex > -1) {
+                        this.secondaryWindows.splice(extIndex, 1);
+                    }
+                }
                 return widget.isDisposed;
             },
             closedWindow => {
-                const extIndex = this.secondaryWindows.indexOf(closedWindow);
-                if (extIndex > -1) {
-                    this.secondaryWindows.splice(extIndex, 1);
-                }
+
             });
 
         if (!newWindow) {
@@ -175,7 +178,6 @@ export class SecondaryWindowHandler {
 
         const mainWindowTitle = document.title;
         newWindow.onload = () => {
-            this.keybindings.registerEventListeners(newWindow);
             // Use the widget's title as the window title
             // Even if the widget's label were malicious, this should be safe against XSS because the HTML standard defines this is inserted via a text node.
             // See https://html.spec.whatwg.org/multipage/dom.html#document.title
@@ -186,6 +188,8 @@ export class SecondaryWindowHandler {
                 console.error('Could not find dom element to attach to in secondary window');
                 return;
             }
+
+            const disposKeybindingsListener = this.keybindings.registerEventListeners(newWindow);
             const unregisterWithColorContribution = this.colorAppContribution.registerWindow(newWindow);
 
             widget.secondaryWindow = newWindow;
@@ -201,6 +205,7 @@ export class SecondaryWindowHandler {
 
             // Close the window if the widget is disposed, e.g. by a command closing all widgets.
             widget.disposed.connect(() => {
+                disposKeybindingsListener.dispose();
                 unregisterWithColorContribution.dispose();
                 this.removeWidget(widget);
             });

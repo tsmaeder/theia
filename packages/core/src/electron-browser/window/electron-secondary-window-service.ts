@@ -44,20 +44,22 @@ export class ElectronSecondaryWindowService extends DefaultSecondaryWindowServic
     protected override doCreateSecondaryWindow(id: string, wouldLoseStateOnClosing: () => boolean, tryCloseWidget: (trySaving: boolean) => Promise<boolean>,
         closed: (win: Window) => void): Window | undefined {
         let win: Window | undefined = undefined;
-        electronRemote.getCurrentWindow().webContents.once('did-create-window', newElectronWindow => {
-            // newElectronWindow.setMenuBarVisibility(false);
+        const currentWindow = electronRemote.getCurrentWindow();
+        const zoom = currentWindow.webContents.getZoomFactor();
+        currentWindow.webContents.once('did-create-window', newElectronWindow => {
+            newElectronWindow.setMenuBarVisibility(false);
+            newElectronWindow.webContents.setZoomFactor(zoom);
             this.electronWindows.set(id, newElectronWindow);
             const electronId = newElectronWindow.id.toString();
-            this.electronWindowsById.set(electronId, () => tryCloseWidget(true));
-            const closedHandler = () => {
-                if (closed) {
+            this.electronWindowsById.set(electronId, async () => {
+                if (await tryCloseWidget(true)) {
                     closed(win!);
+                    this.electronWindows.delete(id);
+                    this.electronWindowsById.delete(electronId);
+                    return true;
                 }
-
-                this.electronWindows.delete(id);
-                this.electronWindowsById.delete(electronId);
-            };
-            newElectronWindow.once('closed', closedHandler);
+                return false;
+            });
         });
         win = window.open(DefaultSecondaryWindowService.SECONDARY_WINDOW_URL, id, 'popup') || undefined;
         return win;

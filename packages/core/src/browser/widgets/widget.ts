@@ -336,17 +336,23 @@ export function waitForHidden(widget: Widget): Promise<void> {
 }
 
 function waitForVisible(widget: Widget, visible: boolean, attached?: boolean): Promise<void> {
-    const win = widget.node.ownerDocument.defaultView || window;
     if ((typeof attached !== 'boolean' || widget.isAttached === attached) &&
         (widget.isVisible === visible || (widget.node.style.visibility !== 'hidden') === visible)
     ) {
-        return new Promise(resolve => win.requestAnimationFrame(() => resolve()));
+        return new Promise(resolve => setTimeout(() => resolve()));
     }
-    return new Promise(resolve => {
-        const waitFor = () => win.requestAnimationFrame(() => {
+    return new Promise((resolve, reject) => {
+        const start = Date.now();
+
+        const waitFor = () => setTimeout(() => {
+            if (Date.now() - start > 2000) {
+                console.log('too long');
+                reject(new Error('Wait for visible timed out'));
+                return;
+            }
             if ((typeof attached !== 'boolean' || widget.isAttached === attached) &&
                 (widget.isVisible === visible || (widget.node.style.visibility !== 'hidden') === visible)) {
-                win.requestAnimationFrame(() => resolve());
+                setTimeout(() => resolve());
             } else {
                 waitFor();
             }

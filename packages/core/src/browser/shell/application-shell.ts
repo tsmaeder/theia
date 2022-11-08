@@ -1171,12 +1171,15 @@ export class ApplicationShell extends Widget {
     }
 
     waitForActivation(id: string): Promise<void> {
+
+        // TODO: check for illegal access
         if (this.activeWidget && this.activeWidget.id === id) {
             return Promise.resolve();
         }
         const activation = new Deferred();
         const success = this.onDidChangeActiveWidget(() => {
             if (this.activeWidget && this.activeWidget.id === id) {
+                console.log('activation succeeded');
                 activation.resolve();
             }
         });
@@ -1221,42 +1224,10 @@ export class ApplicationShell extends Widget {
      * `activeWidget` property.
      */
     private checkActivation(widget: Widget): Widget {
-        const onActivateRequest = widget['onActivateRequest'].bind(widget);
-        widget['onActivateRequest'] = (msg: Message) => {
-            onActivateRequest(msg);
-            this.assertActivated(widget);
-        };
         return widget;
     }
 
     private readonly activationTimeout = 2000;
-    private readonly toDisposeOnActivationCheck = new DisposableCollection();
-    private assertActivated(widget: Widget): void {
-        this.toDisposeOnActivationCheck.dispose();
-
-        const onDispose = () => this.toDisposeOnActivationCheck.dispose();
-        widget.disposed.connect(onDispose);
-        this.toDisposeOnActivationCheck.push(Disposable.create(() => widget.disposed.disconnect(onDispose)));
-
-        let start = 0;
-        const step: FrameRequestCallback = timestamp => {
-            const activeElement = widget.node.ownerDocument.activeElement;
-            if (activeElement && widget.node.contains(activeElement)) {
-                return;
-            }
-            if (!start) {
-                start = timestamp;
-            }
-            const delta = timestamp - start;
-            if (delta < this.activationTimeout) {
-                request = window.requestAnimationFrame(step);
-            } else {
-                console.warn(`Widget was activated, but did not accept focus after ${this.activationTimeout}ms: ${widget.id}`);
-            }
-        };
-        let request = window.requestAnimationFrame(step);
-        this.toDisposeOnActivationCheck.push(Disposable.create(() => window.cancelAnimationFrame(request)));
-    }
 
     /**
      * Reveal a widget in the application shell. This makes the widget visible,

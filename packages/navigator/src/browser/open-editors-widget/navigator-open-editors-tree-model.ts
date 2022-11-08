@@ -97,7 +97,7 @@ export class OpenEditorsModel extends FileTreeModel {
                 }
             });
         }));
-        this.toDispose.push(this.applicationShell.onDidRemoveWidget(() => this.updateOpenWidgets()));
+        this.toDispose.push(this.applicationShell.onDidRemoveWidget(() => this.doUpdateOpenWidgets()));
         // Check for tabs rearranged in main and bottom
         this.applicationShell.mainPanel.layoutModified.connect(() => this.doUpdateOpenWidgets('main'));
         this.applicationShell.bottomPanel.layoutModified.connect(() => this.doUpdateOpenWidgets('bottom'));
@@ -111,6 +111,16 @@ export class OpenEditorsModel extends FileTreeModel {
     protected updateOpenWidgets = debounce(this.doUpdateOpenWidgets, 250);
 
     protected async doUpdateOpenWidgets(layoutModifiedArea?: ApplicationShell.Area): Promise<void> {
+
+        const rootNode: CompositeTreeNode = {
+            id: 'open-editors:root',
+            parent: undefined,
+            visible: false,
+            children: [],
+        };
+
+        this.root = rootNode;
+
         this._lastEditorWidgetsByArea = this._editorWidgetsByArea;
         this._editorWidgetsByArea = new Map<ApplicationShell.Area, NavigatableWidget[]>();
         let doRebuild = true;
