@@ -164,6 +164,7 @@ export class SecondaryWindowHandler {
                 if (extIndex > -1) {
                     this.secondaryWindows.splice(extIndex, 1);
                 }
+                widget.secondaryWindow = undefined;
             });
 
         if (!newWindow) {

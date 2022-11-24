@@ -30,6 +30,8 @@ export const CLOSE_REQUESTED_SIGNAL = 'close-requested';
  * Emitted by main when close requested.
  */
 export const CLOSE_SECONDARY_REQUESTED_SIGNAL = 'close-secondary-requested';
+
+export const FOCUS_SECONDARY_REQUESTED_SIGNAL = 'focus-secondary-requested';
 /**
  * Emitted by window when a reload is requested.
  */
@@ -46,7 +48,11 @@ export interface CloseRequestArguments {
 }
 
 export interface CloseSecondaryRequestArguments {
-    windowId: string;
+    windowName: string;
     confirmChannel: string;
     cancelChannel: string;
+}
+
+export interface FocusSecondaryRequestArguments {
+    windowId: string;
 }

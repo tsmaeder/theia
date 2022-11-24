@@ -16,9 +16,12 @@
 
 import { FrontendApplicationConfig } from '@theia/application-package';
 import { FrontendApplicationState } from '../common/frontend-application-state';
-import { APPLICATION_STATE_CHANGE_SIGNAL, CloseSecondaryRequestArguments, CLOSE_REQUESTED_SIGNAL, CLOSE_SECONDARY_REQUESTED_SIGNAL, RELOAD_REQUESTED_SIGNAL, StopReason }
+import {
+    APPLICATION_STATE_CHANGE_SIGNAL, CloseSecondaryRequestArguments, CLOSE_REQUESTED_SIGNAL, CLOSE_SECONDARY_REQUESTED_SIGNAL,
+    FocusSecondaryRequestArguments, FOCUS_SECONDARY_REQUESTED_SIGNAL, RELOAD_REQUESTED_SIGNAL, StopReason
+}
     from '../electron-common/messaging/electron-messages';
-import { BrowserWindow, BrowserWindowConstructorOptions, ipcMain, IpcMainEvent } from '../../electron-shared/electron';
+import { BrowserWindow, BrowserWindowConstructorOptions, ipcMain, IpcMainEvent, webContents } from '../../electron-shared/electron';
 import { inject, injectable, postConstruct } from '../../shared/inversify';
 import { ElectronMainApplicationGlobals } from './electron-main-constants';
 import { DisposableCollection, Emitter, Event } from '../common';
@@ -82,10 +85,13 @@ export class TheiaElectronWindow {
         this.attachCloseListeners();
         this.trackApplicationState();
         this.attachReloadListener();
-        this.attachSecondaryWindowListener();
+        this.attachSecondaryWindowListeners();
     }
 
-    protected attachSecondaryWindowListener(): void {
+    protected attachSecondaryWindowListeners(): void {
+        createDisposableListener(ipcMain, FOCUS_SECONDARY_REQUESTED_SIGNAL, (_e, args: FocusSecondaryRequestArguments) => {
+            this.handleSecondaryWindowFocus(args.windowId);
+        });
         createDisposableListener(this._window.webContents, 'did-create-window', (newWindow: BrowserWindow) => {
             let closingState = ClosingState.initial;
             newWindow.on('close', event => {
@@ -95,13 +101,11 @@ export class TheiaElectronWindow {
                     this.checkSafeToCloseSecondaryWindow(newWindow).then(shouldClose => {
                         if (shouldClose) {
                             // removing the focus from the secondary window before close is necessary
-                            // to prevent "illegal access" errors. Unfortunately, it is unclear what 
+                            // to prevent "illegal access" errors. Unfortunately, it is unclear what
                             // exactly causes the errors.
                             this._window.focus();
-                            setTimeout(() => {
-                                closingState = ClosingState.readyToClose;
-                                newWindow.close();
-                            }, 100);
+                            closingState = ClosingState.readyToClose;
+                            newWindow.close();
                         } else {
                             closingState = ClosingState.initial;
                         }
@@ -113,6 +117,27 @@ export class TheiaElectronWindow {
                 }
             });
         });
+    }
+
+    protected findWindowByName(windowName: string): BrowserWindow | undefined {
+        const wc = webContents.getAllWebContents().find(candidate => candidate.mainFrame.name === windowName);
+        if (wc) {
+            return BrowserWindow.fromWebContents(wc) || undefined;
+        }
+        return undefined;
+    }
+
+    protected handleSecondaryWindowFocus(windowName: string): void {
+        // window.name is the target name given to the window.open call as the second parameter.
+        const electronWindow = this.findWindowByName(windowName);
+        if (electronWindow) {
+            if (electronWindow.isMinimized()) {
+                electronWindow.restore();
+            }
+            electronWindow.focus();
+        } else {
+            console.warn(`There is no known secondary window '${windowName}'. Thus, the window could not be focussed.`);
+        }
     }
 
     /**
@@ -180,7 +205,7 @@ export class TheiaElectronWindow {
         const cancelChannel = `notSafeToClose-${this._window.id}`;
         const temporaryDisposables = new DisposableCollection();
         return new Promise<boolean>(resolve => {
-            const params: CloseSecondaryRequestArguments = { windowId: win.id.toString(), confirmChannel, cancelChannel };
+            const params: CloseSecondaryRequestArguments = { windowName: win.webContents.mainFrame.name, confirmChannel, cancelChannel };
             this._window.webContents.send(CLOSE_SECONDARY_REQUESTED_SIGNAL, params);
             createDisposableListener(ipcMain, confirmChannel, (e: IpcMainEvent) => {
                 if (this.isSender(e)) {

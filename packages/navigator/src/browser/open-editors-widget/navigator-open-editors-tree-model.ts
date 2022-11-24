@@ -60,7 +60,6 @@ export class OpenEditorsModel extends FileTreeModel {
     protected _editorWidgetsByArea = new Map<ApplicationShell.Area, NavigatableWidget[]>();
 
     // Last collection of editors before a layout modification, used to detect changes in widget ordering
-    protected _lastEditorWidgetsByArea = new Map<ApplicationShell.Area, NavigatableWidget[]>();
 
     protected cachedFileStats = new Map<string, FileStat>();
 
@@ -111,7 +110,7 @@ export class OpenEditorsModel extends FileTreeModel {
     protected updateOpenWidgets = debounce(this.doUpdateOpenWidgets, 250);
 
     protected async doUpdateOpenWidgets(layoutModifiedArea?: ApplicationShell.Area): Promise<void> {
-        this._lastEditorWidgetsByArea = this._editorWidgetsByArea;
+        let lastEditorWidgetsByArea = this._editorWidgetsByArea;
         this._editorWidgetsByArea = new Map<ApplicationShell.Area, NavigatableWidget[]>();
         let doRebuild = true;
         const areas: ApplicationShell.Area[] = ['main', 'bottom', 'left', 'right', 'top', 'secondaryWindow'];
@@ -121,23 +120,23 @@ export class OpenEditorsModel extends FileTreeModel {
                 this._editorWidgetsByArea.set(area, editorWidgetsForArea);
             }
         });
-        if (this._lastEditorWidgetsByArea.size === 0) {
-            this._lastEditorWidgetsByArea = this._editorWidgetsByArea;
+        if (lastEditorWidgetsByArea.size === 0) {
+            lastEditorWidgetsByArea = this._editorWidgetsByArea;
         }
         // `layoutModified` can be triggered when tabs are clicked, even if they are not rearranged.
         // This will check for those instances and prevent a rebuild if it is unnecessary. Rebuilding
         // the tree if there is no change can cause the tree's selection to flicker.
         if (layoutModifiedArea) {
-            doRebuild = this.shouldRebuildTreeOnLayoutModified(layoutModifiedArea);
+            doRebuild = this.shouldRebuildTreeOnLayoutModified(layoutModifiedArea, lastEditorWidgetsByArea);
         }
         if (doRebuild) {
             this.root = await this.buildRootFromOpenedWidgets(this._editorWidgetsByArea);
         }
     }
 
-    protected shouldRebuildTreeOnLayoutModified(area: ApplicationShell.Area): boolean {
+    protected shouldRebuildTreeOnLayoutModified(area: ApplicationShell.Area, lastEditorWidgetsByArea: Map<ApplicationShell.Area, NavigatableWidget[]>): boolean {
         const currentOrdering = this._editorWidgetsByArea.get(area);
-        const previousOrdering = this._lastEditorWidgetsByArea.get(area);
+        const previousOrdering = lastEditorWidgetsByArea.get(area);
         if (currentOrdering?.length === 1) {
             return true;
         }
