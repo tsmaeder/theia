@@ -20,6 +20,7 @@ import { TerminalOptions } from '@theia/plugin';
 import { CancellationToken } from '@theia/core/shared/vscode-languageserver-protocol';
 import { TerminalWidget } from '@theia/terminal/lib/browser/base/terminal-widget';
 import { TerminalService } from '@theia/terminal/lib/browser/base/terminal-service';
+import { TerminalProfileService } from '@theia/terminal/lib/browser/terminal-profile-service';
 import { TerminalServiceMain, TerminalServiceExt, MAIN_RPC_CONTEXT } from '../../common/plugin-api-rpc';
 import { RPCProtocol } from '../../common/rpc-protocol';
 import { Disposable, DisposableCollection } from '@theia/core/lib/common/disposable';
@@ -34,6 +35,7 @@ import { URI } from '@theia/core/lib/common/uri';
 export class TerminalServiceMainImpl implements TerminalServiceMain, TerminalLinkProvider, Disposable {
 
     private readonly terminals: TerminalService;
+    private readonly terminalProfileService: TerminalProfileService;
     private readonly shell: ApplicationShell;
     private readonly extProxy: TerminalServiceExt;
     private readonly shellTerminalServer: ShellTerminalServerProxy;
@@ -43,6 +45,7 @@ export class TerminalServiceMainImpl implements TerminalServiceMain, TerminalLin
 
     constructor(rpc: RPCProtocol, container: interfaces.Container) {
         this.terminals = container.get(TerminalService);
+        this.terminalProfileService = container.get(TerminalProfileService);
         this.shell = container.get(ApplicationShell);
         this.shellTerminalServer = container.get(ShellTerminalServerProxy);
         this.extProxy = rpc.getProxy(MAIN_RPC_CONTEXT.TERMINAL_EXT);
@@ -59,6 +62,17 @@ export class TerminalServiceMainImpl implements TerminalServiceMain, TerminalLin
         }
 
         container.bind(TerminalLinkProvider).toDynamicValue(() => this);
+    }
+    async $registerTerminalProfileProvider(providerId: string, profileId: string): Promise<void> {
+        return this.terminalProfileService.registerTerminalProfile(profileId, {
+            label: profileId,
+            start(): TerminalWidget | undefined {
+                return undefined;
+            }
+        });
+    }
+    $unregisterTerminalProfileProvider(providerId: string): Promise<void> {
+        throw new Error('Method not implemented.');
     }
 
     $setEnvironmentVariableCollection(extensionIdentifier: string, persistent: boolean, collection: SerializableEnvironmentVariableCollection | undefined): void {

@@ -417,6 +417,19 @@ export interface TerminalServiceMain {
      * @param providerId id of the terminal link provider to be unregistered.
      */
     $unregisterTerminalLinkProvider(providerId: string): Promise<void>;
+
+    /**
+     * Register a new terminal profile provider.
+     * @param providerId id of the terminal link provider to be registered.
+     * @param profileId id of the provide profile
+     */
+    $registerTerminalProfileProvider(providerId: string, profileId: string): Promise<void>;
+
+    /**
+     * Unregister the terminal link provider with the specified id.
+     * @param providerId id of the terminal link provider to be unregistered.
+     */
+    $unregisterTerminalProfileProvider(providerId: string): Promise<void>;
 }
 
 export interface AutoFocus {

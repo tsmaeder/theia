@@ -36,9 +36,9 @@ export class TerminalServiceExtImpl implements TerminalServiceExt {
 
     private readonly _pseudoTerminals = new Map<string, PseudoTerminal>();
 
-    private static nextTerminalLinkProviderId = 0;
+    private static nextProviderId = 0;
     private readonly terminalLinkProviders = new Map<string, theia.TerminalLinkProvider>();
-
+    private readonly terminalProfileProviders = new Map<string, theia.TerminalProfileProvider>();
     private readonly onDidCloseTerminalEmitter = new Emitter<Terminal>();
     readonly onDidCloseTerminal: theia.Event<Terminal> = this.onDidCloseTerminalEmitter.event;
 
@@ -189,12 +189,22 @@ export class TerminalServiceExtImpl implements TerminalServiceExt {
     }
 
     registerTerminalLinkProvider(provider: theia.TerminalLinkProvider): theia.Disposable {
-        const providerId = (TerminalServiceExtImpl.nextTerminalLinkProviderId++).toString();
+        const providerId = (TerminalServiceExtImpl.nextProviderId++).toString();
         this.terminalLinkProviders.set(providerId, provider);
         this.proxy.$registerTerminalLinkProvider(providerId);
         return Disposable.create(() => {
             this.proxy.$unregisterTerminalLinkProvider(providerId);
             this.terminalLinkProviders.delete(providerId);
+        });
+    }
+
+    registerTerminalProfileProvider(id: string, provider: theia.TerminalProfileProvider): theia.Disposable {
+        const providerId = (TerminalServiceExtImpl.nextProviderId++).toString();
+        this.terminalProfileProviders.set(providerId, provider);
+        this.proxy.$registerTerminalProfileProvider(providerId, id);
+        return Disposable.create(() => {
+            this.proxy.$unregisterTerminalProfileProvider(providerId);
+            this.terminalProfileProviders.delete(providerId);
         });
     }
 

@@ -152,6 +152,7 @@ import {
     TextDocumentChangeReason,
     InputBoxValidationSeverity,
     TerminalLink,
+    TerminalProfile,
     InlayHint,
     InlayHintKind,
     InlayHintLabelPart,
@@ -501,6 +502,9 @@ export function createAPIFactory(
             },
             registerTerminalLinkProvider(provider: theia.TerminalLinkProvider): theia.Disposable {
                 return terminalExt.registerTerminalLinkProvider(provider);
+            },
+            registerTerminalProfileProvider(id: string, provider: theia.TerminalProfileProvider): theia.Disposable {
+                return terminalExt.registerTerminalProfileProvider(id, provider);
             },
             get activeColorTheme(): theia.ColorTheme {
                 return themingExt.activeColorTheme;
@@ -1119,6 +1123,7 @@ export function createAPIFactory(
             SourceControlInputBoxValidationType,
             FileDecoration,
             TerminalLink,
+            TerminalProfile,
             CancellationError,
             ExtensionMode,
             LinkedEditingRanges,
