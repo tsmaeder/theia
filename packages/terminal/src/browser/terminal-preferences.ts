@@ -17,9 +17,33 @@
 /* eslint-disable max-len */
 
 import { interfaces } from '@theia/core/shared/inversify';
-import { createPreferenceProxy, PreferenceProxy, PreferenceService, PreferenceContribution, PreferenceSchema } from '@theia/core/lib/browser';
+import { createPreferenceProxy, PreferenceProxy, PreferenceService, PreferenceContribution, PreferenceSchema, PreferenceSchemaProperties } from '@theia/core/lib/browser';
 import { nls } from '@theia/core/lib/common/nls';
 import { editorGeneratedPreferenceProperties } from '@theia/editor/lib/browser/editor-generated-preference-schema';
+
+const commonProfileProperties: PreferenceSchemaProperties = {
+    args: {
+        type: 'array',
+        items: {
+            type: 'string'
+        }
+    },
+    env: {
+        type: 'object',
+        additionalProperties: {
+            type: 'string'
+        }
+    },
+    overrideName: {
+        type: 'boolean'
+    },
+    icon: {
+        type: 'string'
+    },
+    color: {
+        type: 'string' // should pick from theme color id's here
+    }
+};
 
 export const TerminalConfigSchema: PreferenceSchema = {
     type: 'object',
@@ -153,6 +177,51 @@ export const TerminalConfigSchema: PreferenceSchema = {
                 nls.localize('theia/terminal/confirmCloseChildren', 'Confirm if there are any terminals that have child processes.'),
             ],
             default: 'never'
+        },
+        'terminal.integrated.profiles.windows': {
+            type: 'object',
+            properties: {},
+            additionalProperties: {
+                oneOf: [{
+                    type: 'object',
+                    additionalProperties: false,
+                    properties: {
+                        path: { type: 'string' },
+                        ...commonProfileProperties
+                    }
+                },
+                {
+                    type: 'object',
+                    additionalProperties: false,
+                    properties: {
+                        source: { type: 'string' },
+                        ...commonProfileProperties
+                    }
+                }]
+            }
+        },
+        'terminal.integrated.profiles.linux': {
+            type: 'object',
+            properties: {},
+            additionalProperties: {
+                type: 'object',
+                additionalProperties: false,
+                properties: {
+                    path: { type: 'string' },
+                    ...commonProfileProperties
+                }
+            }
+        },
+        'terminal.integrated.profiles.osx': {
+            type: 'object',
+            properties: {},
+            additionalProperties: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string' },
+                    ...commonProfileProperties
+                }
+            }
         }
     }
 };
