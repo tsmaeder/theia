@@ -25,36 +25,39 @@ import { DebugPreferences } from '@theia/debug/lib/browser/debug-preferences';
 import { DebugConfigurationSessionOptions } from '@theia/debug/lib/browser/debug-session-options';
 import { DebugSession } from '@theia/debug/lib/browser/debug-session';
 import { DebugSessionConnection } from '@theia/debug/lib/browser/debug-session-connection';
-import { TerminalWidgetOptions, TerminalWidget } from '@theia/terminal/lib/browser/base/terminal-widget';
+import { TerminalWidgetOptions } from '@theia/terminal/lib/browser/base/terminal-widget';
 import { TerminalOptionsExt } from '../../../common/plugin-api-rpc';
 import { FileService } from '@theia/filesystem/lib/browser/file-service';
 import { DebugContribution } from '@theia/debug/lib/browser/debug-contribution';
 import { ContributionProvider } from '@theia/core/lib/common/contribution-provider';
 import { WorkspaceService } from '@theia/workspace/lib/browser';
 import { PluginChannel } from '../../../common/connection';
+import { ShellPty, ShellPtyFactory } from '@theia/terminal/lib/browser/shell-pty-factory';
+import { ShellExecutionOptions } from '@theia/plugin';
 
 export class PluginDebugSession extends DebugSession {
     constructor(
-        override readonly id: string,
-        override readonly options: DebugConfigurationSessionOptions,
-        override readonly parentSession: DebugSession | undefined,
-        protected override readonly connection: DebugSessionConnection,
-        protected override readonly terminalServer: TerminalService,
-        protected override readonly editorManager: EditorManager,
-        protected override readonly breakpoints: BreakpointManager,
-        protected override readonly labelProvider: LabelProvider,
-        protected override readonly messages: MessageClient,
-        protected override readonly fileService: FileService,
+        id: string,
+        options: DebugConfigurationSessionOptions,
+        parentSession: DebugSession | undefined,
+        connection: DebugSessionConnection,
+        terminalService: TerminalService,
+        shellPtyFactory: ShellPtyFactory,
+        editorManager: EditorManager,
+        breakpoints: BreakpointManager,
+        labelProvider: LabelProvider,
+        messages: MessageClient,
+        fileService: FileService,
         protected readonly terminalOptionsExt: TerminalOptionsExt | undefined,
-        protected override readonly debugContributionProvider: ContributionProvider<DebugContribution>,
-        protected override readonly workspaceService: WorkspaceService) {
-        super(id, options, parentSession, connection, terminalServer, editorManager, breakpoints, labelProvider, messages, fileService, debugContributionProvider,
+        debugContributionProvider: ContributionProvider<DebugContribution>,
+        workspaceService: WorkspaceService) {
+        super(id, options, parentSession, connection, terminalService, shellPtyFactory, editorManager, breakpoints, labelProvider, messages, fileService, debugContributionProvider,
             workspaceService);
     }
 
-    protected override async doCreateTerminal(terminalWidgetOptions: TerminalWidgetOptions): Promise<TerminalWidget> {
-        terminalWidgetOptions = Object.assign({}, terminalWidgetOptions, this.terminalOptionsExt);
-        return super.doCreateTerminal(terminalWidgetOptions);
+    protected override async doCreateTerminal(options: TerminalWidgetOptions, shellOptions: ShellExecutionOptions): Promise<ShellPty> {
+        options = Object.assign({}, options, this.terminalOptionsExt);
+        return super.doCreateTerminal(options, shellOptions);
     }
 }
 
@@ -92,6 +95,7 @@ export class PluginDebugSessionFactory extends DefaultDebugSessionFactory {
             parentSession,
             connection,
             this.terminalService,
+            this.shellPtyFactory,
             this.editorManager,
             this.breakpoints,
             this.labelProvider,
@@ -101,5 +105,6 @@ export class PluginDebugSessionFactory extends DefaultDebugSessionFactory {
             this.debugContributionProvider,
             this.workspaceService,
         );
+
     }
 }

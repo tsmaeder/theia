@@ -11546,7 +11546,7 @@ export module '@theia/plugin' {
          * the parent process' environment is used. If provided it is merged with
          * the parent process' environment.
          */
-        env?: { [key: string]: string };
+        env?: { [key: string]: string | null };
     }
 
     export class ShellExecution {

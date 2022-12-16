@@ -61,7 +61,7 @@ export class TasksExtImpl implements TasksExt {
         return this.onDidExecuteTask.event;
     }
 
-    async $onDidStartTask(execution: TaskExecutionDto, terminalId: number): Promise<void> {
+    async $onDidStartTask(execution: TaskExecutionDto, terminalId: string): Promise<void> {
         const customExecution = this.customExecutionFunctions.get(execution.task.executionId || '');
         if (customExecution) {
             const taskDefinition = converter.toTask(execution.task).definition;

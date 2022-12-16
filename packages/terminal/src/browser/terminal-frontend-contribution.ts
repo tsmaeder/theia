@@ -38,7 +38,7 @@ import { TerminalKeybindingContexts } from './terminal-keybinding-contexts';
 import { TerminalService } from './base/terminal-service';
 import { TerminalWidgetOptions, TerminalWidget } from './base/terminal-widget';
 import { UriAwareCommandHandler } from '@theia/core/lib/common/uri-command-handler';
-import { ShellTerminalServerProxy } from '../common/shell-terminal-protocol';
+import { IShellTerminalServerOptions, ShellTerminalServerProxy } from '../common/shell-terminal-protocol';
 import URI from '@theia/core/lib/common/uri';
 import { MAIN_MENU_BAR } from '@theia/core';
 import { WorkspaceService } from '@theia/workspace/lib/browser';
@@ -55,6 +55,7 @@ import {
 } from '../common/base-terminal-protocol';
 import { nls } from '@theia/core/lib/common/nls';
 import { TerminalPreferences } from './terminal-preferences';
+import { ShellPtyFactory } from './shell-pty-factory';
 
 export namespace TerminalMenus {
     export const TERMINAL = [...MAIN_MENU_BAR, '7_terminal'];
@@ -154,6 +155,7 @@ export class TerminalFrontendContribution implements FrontendApplicationContribu
     @inject(WidgetManager) protected readonly widgetManager: WidgetManager;
     @inject(FileService) protected readonly fileService: FileService;
     @inject(SelectionService) protected readonly selectionService: SelectionService;
+    @inject(ShellPtyFactory) protected readonly shellPtyFactory: ShellPtyFactory;
 
     @inject(LabelProvider)
     protected readonly labelProvider: LabelProvider;
@@ -325,8 +327,8 @@ export class TerminalFrontendContribution implements FrontendApplicationContribu
         return this.all.find(terminal => terminal.id === id);
     }
 
-    getByTerminalId(terminalId: number): TerminalWidget | undefined {
-        return this.all.find(terminal => terminal.terminalId === terminalId);
+    getByTerminalProcessId(processId: number): TerminalWidget | undefined {
+        return this.all.find(terminal => terminal.pty && terminal.pty.processId === processId);
     }
 
     getDefaultShell(): Promise<string> {
@@ -461,8 +463,8 @@ export class TerminalFrontendContribution implements FrontendApplicationContribu
         const cwd = (stat.isDirectory) ? uri.toString() : uri.parent.toString();
 
         // Open terminal
-        const termWidget = await this.newTerminal({ cwd });
-        termWidget.start();
+        const termWidget = await this.newTerminal({});
+        termWidget.start(() => this.shellPtyFactory.createPty({ rootURI: cwd }));
         this.open(termWidget);
     }
 
@@ -697,14 +699,18 @@ export class TerminalFrontendContribution implements FrontendApplicationContribu
 
     protected async openTerminal(options?: ApplicationShell.WidgetOptions): Promise<void> {
         const cwd = await this.selectTerminalCwd();
-        const termWidget = await this.newTerminal({ cwd });
-        termWidget.start();
+        const shellOptions: IShellTerminalServerOptions = {};
+        if (cwd) {
+            shellOptions.rootURI = URI.file(cwd).toString();
+        }
+        const termWidget = await this.newTerminal({});
+        termWidget.start(() => this.shellPtyFactory.createPty(shellOptions));
         this.open(termWidget, { widgetOptions: options });
     }
 
     protected async openActiveWorkspaceTerminal(options?: ApplicationShell.WidgetOptions): Promise<void> {
         const termWidget = await this.newTerminal({});
-        termWidget.start();
+        termWidget.start(() => this.shellPtyFactory.createPty({}));
         this.open(termWidget, { widgetOptions: options });
     }
 

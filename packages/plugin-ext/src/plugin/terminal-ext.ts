@@ -85,7 +85,7 @@ export class TerminalServiceExtImpl implements TerminalServiceExt {
                 shellArgs: shellArgs
             };
         }
-        this.proxy.$createTerminal(id, options, !!pseudoTerminal);
+        this.proxy.$createShellTerminal(options);
 
         let creationOptions: theia.TerminalOptions | theia.ExtensionTerminalOptions = options;
         // make sure to pass ExtensionTerminalOptions as creation options
@@ -95,7 +95,7 @@ export class TerminalServiceExtImpl implements TerminalServiceExt {
         return this.obtainTerminal(id, options.name || 'Terminal', creationOptions);
     }
 
-    attachPtyToTerminal(terminalId: number, pty: theia.Pseudoterminal): void {
+    attachPtyToTerminal(terminalId: string, pty: theia.Pseudoterminal): void {
         this._pseudoTerminals.set(terminalId.toString(), new PseudoTerminal(terminalId, this.proxy, pty, true));
     }
 
@@ -375,46 +375,31 @@ export class TerminalExtImpl implements Terminal {
 
 export class PseudoTerminal {
     constructor(
-        id: string | number,
+        id: string,
         private readonly proxy: TerminalServiceMain,
         private readonly pseudoTerminal: theia.Pseudoterminal,
         waitOnExit?: boolean | string
     ) {
 
         pseudoTerminal.onDidWrite(data => {
-            if (typeof id === 'string') {
-                this.proxy.$write(id, data);
-            } else {
-                this.proxy.$writeByTerminalId(id, data);
-            }
+            this.proxy.$write(id, data);
         });
+
         if (pseudoTerminal.onDidClose) {
             pseudoTerminal.onDidClose((e: number | void = undefined) => {
-                if (typeof id === 'string') {
-                    this.proxy.$dispose(id);
-                } else {
-                    this.proxy.$disposeByTerminalId(id, waitOnExit);
-                }
+                this.proxy.$dispose(id);
             });
         }
         if (pseudoTerminal.onDidOverrideDimensions) {
             pseudoTerminal.onDidOverrideDimensions(e => {
                 if (e) {
-                    if (typeof id === 'string') {
-                        this.proxy.$resize(id, e.columns, e.rows);
-                    } else {
-                        this.proxy.$resizeByTerminalId(id, e.columns, e.rows);
-                    }
+                    this.proxy.$resize(id, e.columns, e.rows);
                 }
             });
         }
         if (pseudoTerminal.onDidChangeName) {
             pseudoTerminal.onDidChangeName(name => {
-                if (typeof id === 'string') {
-                    this.proxy.$setName(id, name);
-                } else {
-                    this.proxy.$setNameByTerminalId(id, name);
-                }
+                this.proxy.$setName(id, name);
             });
         }
     }

@@ -603,7 +603,7 @@ export class TaskRunningQuickOpen {
                     isMulti,
                     () => {
                         if (task.terminalId) {
-                            const terminal = this.terminalService.getByTerminalId(task.terminalId);
+                            const terminal = this.terminalService.getByTerminalProcessId(task.terminalId);
                             if (terminal) {
                                 this.terminalService.open(terminal);
                             }

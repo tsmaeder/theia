@@ -299,11 +299,14 @@ export interface ConnectionExt {
 }
 
 export interface TerminalServiceMain {
+
+    $createExtensionTerminal(id: string, name: string): Promise<void>;
+
     /**
      * Create new Terminal with Terminal options.
      * @param options - object with parameters to create new terminal.
      */
-    $createTerminal(id: string, options: theia.TerminalOptions, isPseudoTerminal?: boolean): Promise<string>;
+    $createShellTerminal(options: theia.TerminalOptions): Promise<string>;
 
     /**
      * Send text to the terminal by id.
@@ -354,57 +357,7 @@ export interface TerminalServiceMain {
      */
     $setName(id: string, name: string): void;
 
-    /**
-     * Send text to the terminal by id.
-     * @param id - terminal id.
-     * @param text - text content.
-     * @param addNewLine - in case true - add new line after the text, otherwise - don't apply new line.
-     */
-    $sendTextByTerminalId(id: number, text: string, addNewLine?: boolean): void;
-
-    /**
-     * Write data to the terminal by id.
-     * @param id - terminal id.
-     * @param data - data.
-     */
-    $writeByTerminalId(id: number, data: string): void;
-
-    /**
-     * Resize the terminal by id.
-     * @param id - terminal id.
-     * @param cols - columns.
-     * @param rows - rows.
-     */
-    $resizeByTerminalId(id: number, cols: number, rows: number): void;
-
-    /**
-     * Show terminal on the UI panel.
-     * @param id - terminal id.
-     * @param preserveFocus - set terminal focus in case true value, and don't set focus otherwise.
-     */
-    $showByTerminalId(id: number, preserveFocus?: boolean): void;
-
-    /**
-     * Hide UI panel where is located terminal widget.
-     * @param id - terminal id.
-     */
-    $hideByTerminalId(id: number): void;
-
-    /**
-     * Destroy terminal.
-     * @param id - terminal id.
-     * @param waitOnExit - Whether to wait for a key press before closing the terminal.
-     */
-    $disposeByTerminalId(id: number, waitOnExit?: boolean | string): void;
-
     $setEnvironmentVariableCollection(extensionIdentifier: string, persistent: boolean, collection: SerializableEnvironmentVariableCollection | undefined): void;
-
-    /**
-     * Set the terminal widget name.
-     * @param id terminal id.
-     * @param name new terminal widget name.
-     */
-    $setNameByTerminalId(id: number, name: string): void;
 
     /**
      * Register a new terminal link provider.
@@ -2005,7 +1958,7 @@ export interface TasksExt {
     $initLoadedTasks(executions: TaskExecutionDto[]): Promise<void>;
     $provideTasks(handle: number): Promise<TaskDto[] | undefined>;
     $resolveTask(handle: number, task: TaskDto, token?: CancellationToken): Promise<TaskDto | undefined>;
-    $onDidStartTask(execution: TaskExecutionDto, terminalId: number): void;
+    $onDidStartTask(execution: TaskExecutionDto, terminalId: string): void;
     $onDidEndTask(id: number): void;
     $onDidStartTaskProcess(processId: number | undefined, execution: TaskExecutionDto): void;
     $onDidEndTaskProcess(exitCode: number | undefined, taskId: number): void;

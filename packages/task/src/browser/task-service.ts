@@ -66,6 +66,8 @@ import { MonacoWorkspace } from '@theia/monaco/lib/browser/monaco-workspace';
 import { TaskTerminalWidgetManager } from './task-terminal-widget-manager';
 import { ShellTerminalServerProxy } from '@theia/terminal/lib/common/shell-terminal-protocol';
 import { Mutex } from 'async-mutex';
+import { TerminalFactories } from '@theia/terminal/lib/browser/terminal-factories';
+import { ShellPtyFactory } from '@theia/terminal/lib/browser/shell-pty-factory';
 
 export interface QuickPickProblemMatcherItem {
     problemMatchers: NamedProblemMatcher[] | undefined;
@@ -98,7 +100,7 @@ export class TaskService implements TaskConfigurationClient {
     /**
      * The last executed task.
      */
-    protected lastTask: LastRunTaskInfo = {resolvedTask: undefined, option: undefined};
+    protected lastTask: LastRunTaskInfo = { resolvedTask: undefined, option: undefined };
     protected cachedRecentTasks: TaskConfiguration[] = [];
     protected runningTasks = new Map<number, {
         exitCode: Deferred<number | undefined>,
@@ -149,6 +151,12 @@ export class TaskService implements TaskConfigurationClient {
 
     @inject(EditorManager)
     protected readonly editorManager: EditorManager;
+
+    @inject(TerminalFactories)
+    protected readonly terminalFactories: TerminalFactories;
+
+    @inject(ShellPtyFactory)
+    protected readonly shellPtyFactory: ShellPtyFactory;
 
     @inject(ProblemManager)
     protected readonly problemManager: ProblemManager;
@@ -238,7 +246,7 @@ export class TaskService implements TaskConfigurationClient {
                         if (isTaskActiveAndOutputSilent && problem.marker.severity === DiagnosticSeverity.Error) {
                             const terminalId = matchedRunningTaskInfo!.terminalId;
                             if (terminalId) {
-                                const terminal = this.terminalService.getByTerminalId(terminalId);
+                                const terminal = this.terminalService.getByTerminalProcessId(terminalId);
                                 if (terminal) {
                                     const focus = !!matchedRunningTaskInfo!.config.presentation!.focus;
                                     if (focus) { // assign focus to the terminal if presentation.focus is true
@@ -311,7 +319,7 @@ export class TaskService implements TaskConfigurationClient {
                 if (event.code !== 0) {
                     const eventTaskConfig = event.config;
                     if (eventTaskConfig && eventTaskConfig.presentation && eventTaskConfig.presentation.reveal === RevealKind.Silent && event.terminalId) {
-                        const terminal = this.terminalService.getByTerminalId(event.terminalId);
+                        const terminal = this.terminalService.getByTerminalProcessId(event.terminalId);
                         const focus = !!eventTaskConfig.presentation.focus;
                         if (terminal) {
                             if (focus) { // assign focus to the terminal if presentation.focus is true
@@ -766,7 +774,7 @@ export class TaskService implements TaskConfigurationClient {
                 const taskName = this.taskNameResolver.resolve(task);
                 const terminalId = matchedRunningTaskInfo.terminalId;
                 if (terminalId) {
-                    const terminal = this.terminalService.getByTerminalId(terminalId);
+                    const terminal = this.terminalService.getByTerminalProcessId(terminalId);
                     if (terminal) {
                         if (TaskOutputPresentation.shouldSetFocusToTerminal(task)) { // assign focus to the terminal if presentation.focus is true
                             this.terminalService.open(terminal, { mode: 'activate' });
@@ -994,7 +1002,7 @@ export class TaskService implements TaskConfigurationClient {
         let taskInfo: TaskInfo | undefined;
         try {
             taskInfo = await this.taskServer.run(resolvedTask, this.getContext(), option);
-            this.lastTask = {resolvedTask, option };
+            this.lastTask = { resolvedTask, option };
             this.logger.debug(`Task created. Task id: ${taskInfo.taskId}`);
 
             /**
@@ -1062,16 +1070,16 @@ export class TaskService implements TaskConfigurationClient {
         let terminal = this.terminalService.lastUsedTerminal;
         if (!terminal || terminal.kind !== 'user' || (await terminal.hasChildProcesses())) {
             terminal = <TerminalWidget>await this.terminalService.newTerminal(<TerminalWidgetFactoryOptions>{ created: new Date().toString() });
-            await terminal.start();
+            await terminal.start(this.terminalFactories.getDefaultFactory());
             this.terminalService.open(terminal);
         }
         terminal.sendText(selectedText);
     }
 
-    async attach(terminalId: number, taskInfo: TaskInfo): Promise<number | void> {
+    async attach(terminalId: number, taskInfo: TaskInfo): Promise<void> {
         let widgetOpenMode: WidgetOpenMode = 'open';
         if (taskInfo) {
-            const terminalWidget = this.terminalService.getByTerminalId(terminalId);
+            const terminalWidget = this.terminalService.getByTerminalProcessId(terminalId);
             if (terminalWidget) {
                 this.messageService.error('Task is already running in terminal');
                 return this.terminalService.open(terminalWidget, { mode: 'activate' });
@@ -1088,7 +1096,6 @@ export class TaskService implements TaskConfigurationClient {
         // Create / find a terminal widget to display an execution output of a task that was launched as a command inside a shell.
         const widget = await this.taskTerminalWidgetManager.open({
             created: new Date().toString(),
-            id: this.getTerminalWidgetId(terminalId),
             title: taskInfo
                 ? `Task: ${taskInfo.config.label}`
                 : `Task: #${taskId}`,
@@ -1098,11 +1105,11 @@ export class TaskService implements TaskConfigurationClient {
             mode: widgetOpenMode,
             taskInfo
         });
-        return widget.start(terminalId);
+        await widget.start(() => this.shellPtyFactory.attachPty(terminalId));
     }
 
     protected getTerminalWidgetId(terminalId: number): string | undefined {
-        const terminalWidget = this.terminalService.getByTerminalId(terminalId);
+        const terminalWidget = this.terminalService.getByTerminalProcessId(terminalId);
         if (terminalWidget) {
             return terminalWidget.id;
         }

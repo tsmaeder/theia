@@ -193,7 +193,7 @@ export interface TaskInfo {
     /** internal unique task id */
     readonly taskId: number,
     /** terminal id. Defined if task is run as a terminal process */
-    readonly terminalId?: number,
+    readonly processId?: number,
     /** context that was passed as part of task creation, if any */
     readonly ctx?: string,
     /** task config used for launching a task */

@@ -15,16 +15,12 @@
 // *****************************************************************************
 
 import { Event } from '@theia/core';
+import { Deferred } from '@theia/core/lib/common/promise-util';
 import { BaseWidget } from '@theia/core/lib/browser';
-import { CommandLineOptions } from '@theia/process/lib/common/shell-command-builder';
-import { TerminalSearchWidget } from '../search/terminal-search-widget';
-import { TerminalProcessInfo } from '../../common/base-terminal-protocol';
 import URI from '@theia/core/lib/common/uri';
-
-export interface TerminalDimensions {
-    cols: number;
-    rows: number;
-}
+import { TerminalSearchWidget } from '../search/terminal-search-widget';
+import { TerminalFactory } from '../terminal-factories';
+import { Pseudoterminal, TerminalDimensions } from './pseudoterminal';
 
 export interface TerminalExitStatus {
     readonly code: number | undefined;
@@ -34,19 +30,13 @@ export interface TerminalExitStatus {
  * Terminal UI widget.
  */
 export abstract class TerminalWidget extends BaseWidget {
-
-    abstract processId: Promise<number>;
-
-    /**
-     * Get the current executable and arguments.
-     */
-    abstract processInfo: Promise<TerminalProcessInfo>;
-
     /** Terminal kind that indicates whether a terminal is created by a user or by some extension for a user */
     abstract readonly kind: 'user' | string;
 
-    abstract readonly terminalId: number;
+    abstract pty: Pseudoterminal | undefined;
+    readonly waitForPty: Deferred<Pseudoterminal> = new Deferred();
 
+    abstract readonly terminalId: string | undefined;
     abstract readonly dimensions: TerminalDimensions;
 
     abstract readonly exitStatus: TerminalExitStatus | undefined;
@@ -59,26 +49,15 @@ export abstract class TerminalWidget extends BaseWidget {
 
     /**
      * Start terminal and return terminal id.
-     * @param id - terminal id.
+     * @param ptyFactory - a factory to create a Pseudoterminal.
      */
-    abstract start(id?: number): Promise<number>;
+    abstract start<T extends Pseudoterminal>(pytFactory: TerminalFactory<T>): Promise<T>;
 
     /**
      * Send text to the terminal server.
      * @param text - text content.
      */
     abstract sendText(text: string): void;
-
-    /**
-     * Resolves when the command is successfully sent, this doesn't mean that it
-     * was evaluated. Might reject if terminal wasn't properly started yet.
-     *
-     * Note that this method will try to escape your arguments as if it was
-     * someone inputting everything in a shell.
-     *
-     * Supported shells: `bash`, `cmd.exe`, `wsl.exe`, `pwsh/powershell.exe`
-     */
-    abstract executeCommand(commandOptions: CommandLineOptions): Promise<void>;
 
     /** Event that fires when the terminal is connected or reconnected */
     abstract onDidOpen: Event<void>;
@@ -150,32 +129,6 @@ export interface TerminalWidgetOptions {
     readonly title?: string;
 
     /**
-     * Path to the executable shell. For example: `/bin/bash`, `bash`, `sh`.
-     */
-    readonly shellPath?: string;
-
-    /**
-     * Args for the custom shell executable. A string can be used on Windows only which allows
-     * specifying shell args in [command-line format](https://msdn.microsoft.com/en-au/08dfcab2-eb6e-49a4-80eb-87d4076c98c6).
-     */
-    readonly shellArgs?: string[] | string;
-
-    /**
-     * Current working directory.
-     */
-    readonly cwd?: string | URI;
-
-    /**
-     * Environment variables for terminal.
-     */
-    readonly env?: { [key: string]: string | null };
-
-    /**
-     * Whether the terminal process environment should be exactly as provided in `env`.
-     */
-    readonly strictEnv?: boolean;
-
-    /**
      * In case `destroyTermOnClose` is true - terminal process will be destroyed on close terminal widget, otherwise will be kept
      * alive.
      */
@@ -186,11 +139,6 @@ export interface TerminalWidgetOptions {
      * useServerTitle = true then display this title, otherwise display title defined by 'title' argument.
      */
     readonly useServerTitle?: boolean;
-
-    /**
-     * Whether it is a pseudo terminal where an extension controls its input and output.
-     */
-    readonly isPseudoTerminal?: boolean;
 
     /**
      * Terminal id. Should be unique for all DOM.

@@ -31,6 +31,7 @@ import { ContributionProvider } from '@theia/core/lib/common/contribution-provid
 import { FileService } from '@theia/filesystem/lib/browser/file-service';
 import { DebugContribution } from './debug-contribution';
 import { WorkspaceService } from '@theia/workspace/lib/browser';
+import { ShellPtyFactory } from '@theia/terminal/lib/browser/shell-pty-factory';
 
 /**
  * DebugSessionContribution symbol for DI.
@@ -99,6 +100,8 @@ export class DefaultDebugSessionFactory implements DebugSessionFactory {
     protected readonly connectionProvider: WebSocketConnectionProvider;
     @inject(TerminalService)
     protected readonly terminalService: TerminalService;
+    @inject(ShellPtyFactory)
+    protected readonly shellPtyFactory: ShellPtyFactory;
     @inject(EditorManager)
     protected readonly editorManager: EditorManager;
     @inject(BreakpointManager)
@@ -133,6 +136,7 @@ export class DefaultDebugSessionFactory implements DebugSessionFactory {
             parentSession,
             connection,
             this.terminalService,
+            this.shellPtyFactory,
             this.editorManager,
             this.breakpoints,
             this.labelProvider,

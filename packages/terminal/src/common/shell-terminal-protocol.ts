@@ -44,7 +44,6 @@ export interface IShellTerminalServerOptions extends IBaseTerminalServerOptions 
     rows?: number,
     env?: { [key: string]: string | null },
     strictEnv?: boolean,
-    isPseudo?: boolean,
 }
 
 export const ShellTerminalServerProxy = Symbol('ShellTerminalServerProxy');

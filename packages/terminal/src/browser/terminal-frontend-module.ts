@@ -44,6 +44,8 @@ import { createXtermLinkFactory, TerminalLinkProvider, TerminalLinkProviderContr
 import { UrlLinkProvider } from './terminal-url-link-provider';
 import { FileDiffPostLinkProvider, FileDiffPreLinkProvider, FileLinkProvider } from './terminal-file-link-provider';
 import { DefaultTerminalProfileService, TerminalProfileService } from './terminal-profile-service';
+import { ShellPtyFactory } from './shell-pty-factory';
+import { TerminalFactories } from './terminal-factories';
 
 export default new ContainerModule(bind => {
     bindTerminalPreferences(bind);
@@ -107,6 +109,9 @@ export default new ContainerModule(bind => {
     createCommonBindings(bind);
 
     bindContributionProvider(bind, TerminalContribution);
+
+    bind(ShellPtyFactory).toSelf().inSingletonScope();
+    bind(TerminalFactories).toSelf().inSingletonScope();
 
     // terminal link provider contribution point
     bindContributionProvider(bind, TerminalLinkProvider);

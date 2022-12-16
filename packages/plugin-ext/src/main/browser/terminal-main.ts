@@ -25,9 +25,11 @@ import { TerminalServiceMain, TerminalServiceExt, MAIN_RPC_CONTEXT } from '../..
 import { RPCProtocol } from '../../common/rpc-protocol';
 import { Disposable, DisposableCollection } from '@theia/core/lib/common/disposable';
 import { SerializableEnvironmentVariableCollection } from '@theia/terminal/lib/common/base-terminal-protocol';
-import { ShellTerminalServerProxy } from '@theia/terminal/lib/common/shell-terminal-protocol';
+import { IShellTerminalServerOptions, ShellTerminalServerProxy } from '@theia/terminal/lib/common/shell-terminal-protocol';
 import { TerminalLink, TerminalLinkProvider } from '@theia/terminal/lib/browser/terminal-link-provider';
-import { URI } from '@theia/core/lib/common/uri';
+import { Pseudoterminal, TerminalDimensions } from '@theia/terminal/lib/browser/base/pseudoterminal';
+import { Event } from '@theia/core';
+import { ShellPtyFactory } from '@theia/terminal/lib/browser/shell-pty-factory';
 
 /**
  * Plugin api service allows working with terminal emulator.
@@ -39,6 +41,7 @@ export class TerminalServiceMainImpl implements TerminalServiceMain, TerminalLin
     private readonly shell: ApplicationShell;
     private readonly extProxy: TerminalServiceExt;
     private readonly shellTerminalServer: ShellTerminalServerProxy;
+    private readonly shellPtyFactory: ShellPtyFactory;
     private readonly terminalLinkProviders: string[] = [];
 
     private readonly toDispose = new DisposableCollection();
@@ -48,6 +51,7 @@ export class TerminalServiceMainImpl implements TerminalServiceMain, TerminalLin
         this.terminalProfileService = container.get(TerminalProfileService);
         this.shell = container.get(ApplicationShell);
         this.shellTerminalServer = container.get(ShellTerminalServerProxy);
+        this.shellPtyFactory = container.get(ShellPtyFactory);
         this.extProxy = rpc.getProxy(MAIN_RPC_CONTEXT.TERMINAL_EXT);
         this.toDispose.push(this.terminals.onDidCreateTerminal(terminal => this.trackTerminal(terminal)));
         for (const terminal of this.terminals.all) {
@@ -104,12 +108,6 @@ export class TerminalServiceMainImpl implements TerminalServiceMain, TerminalLin
         terminal.title.changed.connect(updateTitle);
         this.toDispose.push(Disposable.create(() => terminal.title.changed.disconnect(updateTitle)));
 
-        const updateProcessId = () => terminal.processId.then(
-            processId => this.extProxy.$terminalOpened(terminal.id, processId, terminal.terminalId, terminal.dimensions.cols, terminal.dimensions.rows),
-            () => {/* no-op */ }
-        );
-        updateProcessId();
-        this.toDispose.push(terminal.onDidOpen(() => updateProcessId()));
         this.toDispose.push(terminal.onTerminalDidClose(term => this.extProxy.$terminalClosed(term.id, term.exitStatus)));
         this.toDispose.push(terminal.onSizeChanged(({ cols, rows }) => {
             this.extProxy.$terminalSizeChanged(terminal.id, cols, rows);
@@ -127,7 +125,6 @@ export class TerminalServiceMainImpl implements TerminalServiceMain, TerminalLin
         }
         terminal.write(data);
     }
-
     $resize(id: string, cols: number, rows: number): void {
         const terminal = this.terminals.getById(id);
         if (!terminal) {
@@ -136,27 +133,37 @@ export class TerminalServiceMainImpl implements TerminalServiceMain, TerminalLin
         terminal.resize(cols, rows);
     }
 
-    async $createTerminal(id: string, options: TerminalOptions, isPseudoTerminal?: boolean): Promise<string> {
+    async $createExtensionTerminal(id: string, name: string): Promise<void> {
+        const terminal = await this.terminals.newTerminal({
+            title: name,
+            destroyTermOnClose: true,
+            useServerTitle: false
+        });
+        terminal.start(() => Promise.resolve(new ExtensionPty(id, this.extProxy)));
+    }
+
+    async $createShellTerminal(options: TerminalOptions): Promise<string> {
         try {
             const terminal = await this.terminals.newTerminal({
-                id,
                 title: options.name,
-                shellPath: options.shellPath,
-                shellArgs: options.shellArgs,
-                cwd: options.cwd ? new URI(options.cwd) : undefined,
-                env: options.env,
-                strictEnv: options.strictEnv,
                 destroyTermOnClose: true,
                 useServerTitle: false,
                 attributes: options.attributes,
                 hideFromUser: options.hideFromUser,
-                isPseudoTerminal
             });
             if (options.message) {
                 terminal.writeLine(options.message);
             }
-            terminal.start();
-            return terminal.id;
+
+            const shellArgs: IShellTerminalServerOptions = {
+                shell: options.shellPath,
+                args: options.shellArgs,
+                env: options.env,
+                rootURI: options.cwd ? options.cwd.toString() : undefined,
+                strictEnv: options.strictEnv,
+            };
+
+            return (await terminal.start(() => this.shellPtyFactory.createPty(shellArgs))).id;
         } catch (error) {
             throw new Error('Failed to create terminal. Cause: ' + error);
         }
@@ -205,64 +212,6 @@ export class TerminalServiceMainImpl implements TerminalServiceMain, TerminalLin
         this.terminals.getById(id)?.setTitle(name);
     }
 
-    $sendTextByTerminalId(id: number, text: string, addNewLine?: boolean): void {
-        const terminal = this.terminals.getByTerminalId(id);
-        if (terminal) {
-            text = text.replace(/\r?\n/g, '\r');
-            if (addNewLine && text.charAt(text.length - 1) !== '\r') {
-                text += '\r';
-            }
-            terminal.sendText(text);
-        }
-    }
-    $writeByTerminalId(id: number, data: string): void {
-        const terminal = this.terminals.getByTerminalId(id);
-        if (!terminal) {
-            return;
-        }
-        terminal.write(data);
-    }
-    $resizeByTerminalId(id: number, cols: number, rows: number): void {
-        const terminal = this.terminals.getByTerminalId(id);
-        if (!terminal) {
-            return;
-        }
-        terminal.resize(cols, rows);
-    }
-    $showByTerminalId(id: number, preserveFocus?: boolean): void {
-        const terminal = this.terminals.getByTerminalId(id);
-        if (terminal) {
-            const options: WidgetOpenerOptions = {};
-            if (preserveFocus) {
-                options.mode = 'reveal';
-            }
-            this.terminals.open(terminal, options);
-        }
-    }
-    $hideByTerminalId(id: number): void {
-        const terminal = this.terminals.getByTerminalId(id);
-        if (terminal && terminal.isVisible) {
-            const area = this.shell.getAreaFor(terminal);
-            if (area) {
-                this.shell.collapsePanel(area);
-            }
-        }
-    }
-    $disposeByTerminalId(id: number, waitOnExit?: boolean | string): void {
-        const terminal = this.terminals.getByTerminalId(id);
-        if (terminal) {
-            if (waitOnExit) {
-                terminal.waitOnExit(waitOnExit);
-                return;
-            }
-            terminal.dispose();
-        }
-    }
-
-    $setNameByTerminalId(id: number, name: string): void {
-        this.terminals.getByTerminalId(id)?.setTitle(name);
-    }
-
     async $registerTerminalLinkProvider(providerId: string): Promise<void> {
         this.terminalLinkProviders.push(providerId);
     }
@@ -282,4 +231,31 @@ export class TerminalServiceMainImpl implements TerminalServiceMain, TerminalLin
         return links.map(link => ({ ...link, handle: () => this.extProxy.$handleTerminalLink(link) }));
     }
 
+}
+class ExtensionPty implements Pseudoterminal {
+    constructor(readonly id: string, protected readonly terminalExt: TerminalServiceExt) { }
+
+    onDidWrite: Event<string>;
+    sendText(data: string): void {
+        this.terminalExt.$terminalOnInput(this.id, data);
+    }
+    setDimensions(dimensions: TerminalDimensions): void {
+        this.terminalExt.$terminalSizeChanged(this.id, dimensions.cols, dimensions.rows);
+    }
+
+    onDidChangeDimensions?: Event<TerminalDimensions | undefined> | undefined;
+
+    close(): void {
+        this.terminalExt.$terminalClosed(this.id, undefined);
+    }
+
+    dispose(): void {
+        throw new Error('Method not implemented.');
+    }
+
+    onDisposed: Event<number | undefined>;
+
+    hasChildProcesses(): Promise<boolean> {
+        return Promise.resolve(true);
+    }
 }

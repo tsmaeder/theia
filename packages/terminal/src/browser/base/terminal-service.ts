@@ -40,10 +40,10 @@ export interface TerminalService {
     getById(id: string): TerminalWidget | undefined;
 
     /**
-     * @param id - the terminal id (NOT the terminal widget id!)
+     * @param processId - the terminal process id
      * @return the widget
      */
-    getByTerminalId(terminalId: number): TerminalWidget | undefined;
+    getByTerminalProcessId(processId: number): TerminalWidget | undefined;
 
     /**
      * Returns detected default shell.

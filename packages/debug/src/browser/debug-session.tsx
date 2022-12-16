@@ -36,13 +36,15 @@ import { BreakpointManager } from './breakpoint/breakpoint-manager';
 import { DebugConfigurationSessionOptions, InternalDebugSessionOptions } from './debug-session-options';
 import { DebugConfiguration, DebugConsoleMode } from '../common/debug-common';
 import { SourceBreakpoint, ExceptionBreakpoint } from './breakpoint/breakpoint-marker';
-import { TerminalWidgetOptions, TerminalWidget } from '@theia/terminal/lib/browser/base/terminal-widget';
+import { TerminalWidgetOptions } from '@theia/terminal/lib/browser/base/terminal-widget';
 import { DebugFunctionBreakpoint } from './model/debug-function-breakpoint';
 import { FileService } from '@theia/filesystem/lib/browser/file-service';
 import { DebugContribution } from './debug-contribution';
 import { Deferred, waitForEvent } from '@theia/core/lib/common/promise-util';
 import { WorkspaceService } from '@theia/workspace/lib/browser';
 import { DebugInstructionBreakpoint } from './model/debug-instruction-breakpoint';
+import { ShellExecutionOptions } from '@theia/plugin';
+import { ShellPty, ShellPtyFactory } from '@theia/terminal/lib/browser/shell-pty-factory';
 
 export enum DebugState {
     Inactive,
@@ -81,7 +83,8 @@ export class DebugSession implements CompositeTreeElement {
         readonly options: DebugConfigurationSessionOptions,
         readonly parentSession: DebugSession | undefined,
         protected readonly connection: DebugSessionConnection,
-        protected readonly terminalServer: TerminalService,
+        protected readonly terminalService: TerminalService,
+        protected readonly shellPtyFactory: ShellPtyFactory,
         protected readonly editorManager: EditorManager,
         protected readonly breakpoints: BreakpointManager,
         protected readonly labelProvider: LabelProvider,
@@ -399,27 +402,32 @@ export class DebugSession implements CompositeTreeElement {
     }
 
     protected async runInTerminal({ arguments: { title, cwd, args, env } }: DebugProtocol.RunInTerminalRequest): Promise<DebugProtocol.RunInTerminalResponse['body']> {
-        const terminal = await this.doCreateTerminal({ title, cwd, env, useServerTitle: false });
-        const { processId } = terminal;
-        await terminal.executeCommand({ cwd, args, env });
-        return { processId: await processId };
+        const terminal = await this.doCreateTerminal({ title, useServerTitle: false }, { cwd, env });
+        const processId = await terminal.executeCommand({ cwd, args, env });
+        return { processId: processId, shellProcessId: terminal.processId };
     }
 
-    protected async doCreateTerminal(options: TerminalWidgetOptions): Promise<TerminalWidget> {
+    protected async doCreateTerminal(options: TerminalWidgetOptions, shellOptions: ShellExecutionOptions): Promise<ShellPty> {
         let terminal = undefined;
-        for (const t of this.terminalServer.all) {
-            if ((t.title.label === options.title || t.title.caption === options.title) && (await t.hasChildProcesses()) === false) {
+
+        this.terminalService.all.filter(t => {
+
+        });
+        for (const t of this.terminalService.all) {
+            const pty = await t.waitForPty.promise;
+            if ((t.title.label === options.title || t.title.caption === options.title) &&
+                (await t.hasChildProcesses()) === false &&
+                pty instanceof ShellPty) {
                 terminal = t;
-                break;
             }
         }
 
         if (!terminal) {
-            terminal = await this.terminalServer.newTerminal(options);
-            await terminal.start();
+            terminal = await this.terminalService.newTerminal(options);
+            await terminal.start(() => this.shellPtyFactory.createPty({}));
         }
-        this.terminalServer.open(terminal);
-        return terminal;
+        this.terminalService.open(terminal);
+        return terminal.pty! as ShellPty;
     }
 
     protected clearThreads(): void {
