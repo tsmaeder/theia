@@ -39,6 +39,8 @@
     "jsonc-parser": "^2.2.0",
     "lodash.clonedeep": "^4.5.0",
     "macaddress": "^0.2.9",
+    "marked": "^4.0.0",
+    "@types/marked": "^4.0.0",
     "mime": "^2.4.4",
     "ps-tree": "^1.2.0",
     "semver": "^5.4.1",

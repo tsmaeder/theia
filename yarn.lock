@@ -1965,6 +1965,11 @@
     "@types/linkify-it" "*"
     "@types/mdurl" "*"
 
+"@types/marked@^4.0.0":
+  version "4.3.0"
+  resolved "https://registry.yarnpkg.com/@types/marked/-/marked-4.3.0.tgz#5cd14a190b0a4d212781cfee7093f611ec74a111"
+  integrity sha512-zK4gSFMjgslsv5Lyvr3O1yCjgmnE4pr8jbG8qVn4QglMwtpvPCf4YT2Wma7Nk95OxUUJI8Z+kzdXohbM7mVpGw==
+
 "@types/mdurl@*":
   version "1.0.2"
   resolved "https://registry.yarnpkg.com/@types/mdurl/-/mdurl-1.0.2.tgz#e2ce9d83a613bacf284c7be7d491945e39e1f8e9"
@@ -4471,9 +4476,9 @@ electron-window@^0.8.0:
     is-electron-renderer "^2.0.0"
 
 electron@^23.2.4:
-  version "23.2.4"
-  resolved "https://registry.yarnpkg.com/electron/-/electron-23.2.4.tgz#6f19be9e45c5e5cdf736d0ed747ce4ed4c4bbfeb"
-  integrity sha512-ceFd+KIhzK3srGY22kcBu8QH7hV1G3DHlgrg2LGjg7mgtzxlXeyKzk2Efq0iFNu3ly14QKfiN5gYdvEenmzOAA==
+  version "23.3.1"
+  resolved "https://registry.yarnpkg.com/electron/-/electron-23.3.1.tgz#8ffe35c363948f1da4278ff8fa8d129e89bd67bf"
+  integrity sha512-N+xGMPwK733BU6xn1qs2t/AE3wKEqhWYLvPqWEu6TRC8yQvf7PNNjtgBTPZ9R0GhtrRgu6kUTX3HSV3UG9r/Dw==
   dependencies:
     "@electron/get" "^2.0.0"
     "@types/node" "^16.11.26"
@@ -6554,9 +6559,9 @@ jschardet@^2.1.1:
   integrity sha512-6I6xT7XN/7sBB7q8ObzKbmv5vN+blzLcboDE1BNEsEfmRXJValMxO6OIRT69ylPBRemS3rw6US+CMCar0OBc9g==
 
 jsdom@^21.1.1:
-  version "21.1.1"
-  resolved "https://registry.yarnpkg.com/jsdom/-/jsdom-21.1.1.tgz#ab796361e3f6c01bcfaeda1fea3c06197ac9d8ae"
-  integrity sha512-Jjgdmw48RKcdAIQyUD1UdBh2ecH7VqwaXPN3ehoZN6MqgVbMn+lRm1aAT1AsdJRAJpwfa4IpwgzySn61h2qu3w==
+  version "21.1.2"
+  resolved "https://registry.yarnpkg.com/jsdom/-/jsdom-21.1.2.tgz#6433f751b8718248d646af1cdf6662dc8a1ca7f9"
+  integrity sha512-sCpFmK2jv+1sjff4u7fzft+pUh2KSUbUrEHYHyfSIbGTIcmnjyp83qg6qLwdJ/I3LpTXx33ACxeRL7Lsyc6lGQ==
   dependencies:
     abab "^2.0.6"
     acorn "^8.8.2"
@@ -6571,7 +6576,7 @@ jsdom@^21.1.1:
     http-proxy-agent "^5.0.0"
     https-proxy-agent "^5.0.1"
     is-potential-custom-element-name "^1.0.1"
-    nwsapi "^2.2.2"
+    nwsapi "^2.2.4"
     parse5 "^7.1.2"
     rrweb-cssom "^0.6.0"
     saxes "^6.0.0"
@@ -7187,6 +7192,11 @@ markdown-it@^12.3.2:
     linkify-it "^3.0.1"
     mdurl "^1.0.1"
     uc.micro "^1.0.5"
+
+marked@^4.0.0:
+  version "4.3.0"
+  resolved "https://registry.yarnpkg.com/marked/-/marked-4.3.0.tgz#796362821b019f734054582038b116481b456cf3"
+  integrity sha512-PRsaiG84bK+AMvxziE/lCFss8juXjNaWzVbN5tXAm4XjeaS9NAHhop+PjQxz2A9h8Q4M/xGmzP8vqNwy6JeK0A==
 
 marked@^4.0.16:
   version "4.2.12"
@@ -8000,7 +8010,7 @@ number-is-nan@^1.0.0:
   resolved "https://registry.yarnpkg.com/number-is-nan/-/number-is-nan-1.0.1.tgz#097b602b53422a522c1afb8790318336941a011d"
   integrity sha512-4jbtZXNAsfZbAHiiqjLPBiCl16dES1zI4Hpzzxw61Tk+loF+sBDBKx1ICKKKwIqQ7M0mFn1TmkN7euSncWgHiQ==
 
-nwsapi@^2.2.2:
+nwsapi@^2.2.4:
   version "2.2.4"
   resolved "https://registry.yarnpkg.com/nwsapi/-/nwsapi-2.2.4.tgz#fd59d5e904e8e1f03c25a7d5a15cfa16c714a1e5"
   integrity sha512-NHj4rzRo0tQdijE9ZqAx6kYDcoRwYwSYzCA8MY3JzfxlrvEU0jhnhJT9BhqhJs7I/dKcrDm6TyulaRqZPIhN5g==
