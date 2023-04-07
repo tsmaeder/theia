@@ -230,7 +230,7 @@ export class TabBarRenderer extends TabBar.Renderer {
         } else {
             width = '';
         }
-        return { zIndex, height, width };
+        return { zIndex, height, minWidth: width, maxWidth: width };
     }
 
     /**
@@ -552,13 +552,6 @@ export class TabBarRenderer extends TabBar.Renderer {
 
 }
 
-export namespace ScrollableTabBar {
-    export interface Options {
-        minimumTabSize: number;
-        defaultTabSize: number;
-    }
-}
-
 /**
  * A specialized tab bar for the main and bottom areas.
  */
@@ -572,6 +565,8 @@ export class ScrollableTabBar extends TabBar<Widget> {
     protected needsRecompute = false;
     protected tabSize = 0;
     private _dynamicTabOptions?: ScrollableTabBar.Options;
+    protected contentContainer: HTMLElement;
+    protected topRow: HTMLElement;
 
     protected readonly toDispose = new DisposableCollection();
 
@@ -579,6 +574,7 @@ export class ScrollableTabBar extends TabBar<Widget> {
         super(options);
         this.scrollBarFactory = () => new PerfectScrollbar(this.scrollbarHost, options);
         this._dynamicTabOptions = dynamicTabOptions;
+        this.rewireDOM();
     }
 
     set dynamicTabOptions(options: ScrollableTabBar.Options | undefined) {
@@ -596,6 +592,29 @@ export class ScrollableTabBar extends TabBar<Widget> {
         }
         super.dispose();
         this.toDispose.dispose();
+    }
+
+    /**
+     * Restructures the DOM defined in PhosphorJS.
+     *
+     * By default the tabs (`li`) are contained in the `this.contentNode` (`ul`) which is wrapped in a `div` (`this.node`).
+     * Instead of this structure, we add a container for the `this.contentNode` and for the toolbar.
+     * The scrollbar will only work for the `ul` part but it does not affect the toolbar, so it can be on the right hand-side.
+     */
+    private rewireDOM(): void {
+        const contentNode = this.node.getElementsByClassName(ScrollableTabBar.Styles.TAB_BAR_CONTENT)[0];
+        if (!contentNode) {
+            throw new Error("'this.node' does not have the content as a direct child with class name 'p-TabBar-content'.");
+        }
+        this.node.removeChild(contentNode);
+        this.contentContainer = document.createElement('div');
+        this.contentContainer.classList.add(ScrollableTabBar.Styles.TAB_BAR_CONTENT_CONTAINER);
+        this.contentContainer.appendChild(contentNode);
+
+        this.topRow = document.createElement('div');
+        this.topRow.classList.add('theia-tabBar-tab-row');
+        this.topRow.appendChild(this.contentContainer);
+        this.node.appendChild(this.topRow);
     }
 
     protected override onAfterAttach(msg: Message): void {
@@ -716,10 +735,38 @@ export class ScrollableTabBar extends TabBar<Widget> {
         return result;
     }
 
-    protected get scrollbarHost(): HTMLElement {
-        return this.node;
+    /**
+     * Overrides the `contentNode` property getter in PhosphorJS' TabBar.
+     */
+    // @ts-expect-error TS2611 `TabBar<T>.contentNode` is declared as `readonly contentNode` but is implemented as a getter.
+    get contentNode(): HTMLUListElement {
+        return this.tabBarContainer.getElementsByClassName(ToolbarAwareTabBar.Styles.TAB_BAR_CONTENT)[0] as HTMLUListElement;
     }
 
+    /**
+     * Overrides the scrollable host from the parent class.
+     */
+    protected get scrollbarHost(): HTMLElement {
+        return this.tabBarContainer;
+    }
+
+    protected get tabBarContainer(): HTMLElement {
+        return this.node.getElementsByClassName(ToolbarAwareTabBar.Styles.TAB_BAR_CONTENT_CONTAINER)[0] as HTMLElement;
+    }
+}
+
+export namespace ScrollableTabBar {
+
+    export interface Options {
+        minimumTabSize: number;
+        defaultTabSize: number;
+    }
+    export namespace Styles {
+
+        export const TAB_BAR_CONTENT = 'p-TabBar-content';
+        export const TAB_BAR_CONTENT_CONTAINER = 'p-TabBar-content-container';
+
+    }
 }
 
 /**
@@ -738,12 +785,9 @@ export class ScrollableTabBar extends TabBar<Widget> {
  *
  */
 export class ToolbarAwareTabBar extends ScrollableTabBar {
-
-    protected contentContainer: HTMLElement;
     protected toolbar: TabBarToolbar | undefined;
     protected breadcrumbsContainer: HTMLElement;
     protected readonly breadcrumbsRenderer: BreadcrumbsRenderer;
-    protected topRow: HTMLElement;
 
     constructor(
         protected readonly tabBarToolbarRegistry: TabBarToolbarRegistry,
@@ -754,7 +798,8 @@ export class ToolbarAwareTabBar extends ScrollableTabBar {
     ) {
         super(options, dynamicTabOptions);
         this.breadcrumbsRenderer = this.breadcrumbsRendererFactory();
-        this.rewireDOM();
+        this.addBreadcrumbs();
+        this.toolbar = this.tabBarToolbarFactory();
         this.toDispose.push(this.tabBarToolbarRegistry.onDidChange(() => this.update()));
         this.toDispose.push(this.breadcrumbsRenderer);
         this.toDispose.push(this.breadcrumbsRenderer.onDidChangeActiveState(active => {
@@ -767,25 +812,6 @@ export class ToolbarAwareTabBar extends ScrollableTabBar {
         const handler = () => this.updateBreadcrumbs();
         this.currentChanged.connect(handler);
         this.toDispose.push(Disposable.create(() => this.currentChanged.disconnect(handler)));
-    }
-
-    /**
-     * Overrides the `contentNode` property getter in PhosphorJS' TabBar.
-     */
-    // @ts-expect-error TS2611 `TabBar<T>.contentNode` is declared as `readonly contentNode` but is implemented as a getter.
-    get contentNode(): HTMLUListElement {
-        return this.tabBarContainer.getElementsByClassName(ToolbarAwareTabBar.Styles.TAB_BAR_CONTENT)[0] as HTMLUListElement;
-    }
-
-    /**
-     * Overrides the scrollable host from the parent class.
-     */
-    protected override get scrollbarHost(): HTMLElement {
-        return this.tabBarContainer;
-    }
-
-    protected get tabBarContainer(): HTMLElement {
-        return this.node.getElementsByClassName(ToolbarAwareTabBar.Styles.TAB_BAR_CONTENT_CONTAINER)[0] as HTMLElement;
     }
 
     protected async updateBreadcrumbs(): Promise<void> {
@@ -844,36 +870,12 @@ export class ToolbarAwareTabBar extends ScrollableTabBar {
      * Instead of this structure, we add a container for the `this.contentNode` and for the toolbar.
      * The scrollbar will only work for the `ul` part but it does not affect the toolbar, so it can be on the right hand-side.
      */
-    protected rewireDOM(): void {
-        const contentNode = this.node.getElementsByClassName(ToolbarAwareTabBar.Styles.TAB_BAR_CONTENT)[0];
-        if (!contentNode) {
-            throw new Error("'this.node' does not have the content as a direct child with class name 'p-TabBar-content'.");
-        }
-        this.node.removeChild(contentNode);
-        this.topRow = document.createElement('div');
-        this.topRow.classList.add('theia-tabBar-tab-row');
-        this.contentContainer = document.createElement('div');
-        this.contentContainer.classList.add(ToolbarAwareTabBar.Styles.TAB_BAR_CONTENT_CONTAINER);
-        this.contentContainer.appendChild(contentNode);
-        this.topRow.appendChild(this.contentContainer);
-        this.node.appendChild(this.topRow);
-        this.toolbar = this.tabBarToolbarFactory();
+    private addBreadcrumbs(): void {
         this.breadcrumbsContainer = document.createElement('div');
         this.breadcrumbsContainer.classList.add('theia-tabBar-breadcrumb-row');
         this.breadcrumbsContainer.appendChild(this.breadcrumbsRenderer.host);
         this.node.appendChild(this.breadcrumbsContainer);
     }
-}
-
-export namespace ToolbarAwareTabBar {
-
-    export namespace Styles {
-
-        export const TAB_BAR_CONTENT = 'p-TabBar-content';
-        export const TAB_BAR_CONTENT_CONTAINER = 'p-TabBar-content-container';
-
-    }
-
 }
 
 /**

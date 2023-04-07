@@ -34,7 +34,6 @@
 |----------------------------------------------------------------------------*/
 
 .p-TabBar.theia-app-sides {
-  display: block;
   color: var(--theia-activityBar-inactiveForeground);
   background: var(--theia-activityBar-background);
   font-size: var(--theia-ui-font-size1);
