@@ -34,6 +34,9 @@ import { IDragEvent } from '@phosphor/dragdrop';
 import { LOCKED_CLASS, PINNED_CLASS } from '../widgets/widget';
 import { CorePreferences } from '../core-preferences';
 import { HoverService } from '../hover-service';
+import { Root, createRoot } from 'react-dom/client';
+import { SelectComponent } from '../widgets/select-component';
+import { createElement } from 'react';
 
 /** The class name added to hidden content nodes, which are required to render vertical side bars. */
 const HIDDEN_CONTENT_CLASS = 'theia-TabBar-hidden-content';
@@ -569,6 +572,8 @@ export class ScrollableTabBar extends TabBar<Widget> {
     protected topRow: HTMLElement;
 
     protected readonly toDispose = new DisposableCollection();
+    protected openTabsContainer: HTMLDivElement;
+    protected openTabsRoot: Root;
 
     constructor(options?: TabBar.IOptions<Widget> & PerfectScrollbar.Options, dynamicTabOptions?: ScrollableTabBar.Options) {
         super(options);
@@ -614,6 +619,12 @@ export class ScrollableTabBar extends TabBar<Widget> {
         this.topRow = document.createElement('div');
         this.topRow.classList.add('theia-tabBar-tab-row');
         this.topRow.appendChild(this.contentContainer);
+
+        this.openTabsContainer = document.createElement('div');
+        this.openTabsContainer.classList.add('theia-tabBar-open-tabs');
+        this.openTabsRoot = createRoot(this.openTabsContainer);
+        this.topRow.appendChild(this.openTabsContainer);
+
         this.node.appendChild(this.topRow);
     }
 
@@ -648,6 +659,15 @@ export class ScrollableTabBar extends TabBar<Widget> {
 
         const content = [];
         if (this.dynamicTabOptions) {
+
+            this.openTabsRoot.render(createElement(SelectComponent, {
+                options: this.titles,
+                onChange: (option, index) => {
+                    this.currentIndex = index;
+                },
+                alignment: 'right'
+            }));
+
             if (this.isMouseOver) {
                 this.needsRecompute = true;
             } else {
@@ -655,8 +675,20 @@ export class ScrollableTabBar extends TabBar<Widget> {
                 if (this.orientation === 'horizontal') {
                     this.tabSize = Math.max(Math.min(this.scrollbarHost.clientWidth / this.titles.length,
                         this.dynamicTabOptions.defaultTabSize), this.dynamicTabOptions.minimumTabSize);
+
+                    let availableWidth = this.scrollbarHost.clientWidth;
+                    if (!this.openTabsContainer.classList.contains('p-mod-hidden')) {
+                        availableWidth += this.openTabsContainer.getBoundingClientRect().width;
+                    }
+                    if (this.dynamicTabOptions.minimumTabSize * this.titles.length <= availableWidth) {
+                        this.openTabsContainer.classList.add('p-mod-hidden');
+                    } else {
+                        this.openTabsContainer.classList.remove('p-mod-hidden');
+                    }
                 }
             }
+        } else {
+            this.openTabsContainer.classList.add('p-mod-hidden');
         }
         for (let i = 0, n = this.titles.length; i < n; ++i) {
             const title = this.titles[i];
