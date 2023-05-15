@@ -1123,6 +1123,13 @@ export enum NotebookEditorRevealType {
     InCenterIfOutsideViewport = 2,
     AtTop = 3
 }
+
+export enum NotebookCellExecutionState {
+    Idle = 1,
+    Pending = 2,
+    Executing = 3,
+}
+
 @es5ClassCompat
 export class NotebookCellData implements theia.NotebookCellData {
     languageId: string;

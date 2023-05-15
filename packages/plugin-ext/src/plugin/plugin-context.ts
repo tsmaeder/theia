@@ -167,6 +167,7 @@ import {
     NotebookCell,
     NotebookCellKind,
     NotebookCellStatusBarAlignment,
+    NotebookCellExecutionState,
     NotebookEditorRevealType,
     NotebookControllerAffinity,
     NotebookCellData,
@@ -1165,7 +1166,8 @@ export function createAPIFactory(
                 provider
             ) {
                 return notebooksExt.registerNotebookCellStatusBarItemProvider(notebookType, provider);
-            }
+            },
+            onDidChangeNotebookCellExecutionState: () => Disposable.create(() => { })
         };
 
         return <typeof theia>{
@@ -1322,6 +1324,7 @@ export function createAPIFactory(
             NotebookCellOutput,
             NotebookCellOutputItem,
             NotebookCellStatusBarAlignment,
+            NotebookCellExecutionState,
             NotebookCellStatusBarItem,
             NotebookControllerAffinity,
             NotebookData,

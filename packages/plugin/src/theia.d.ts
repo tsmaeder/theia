@@ -22,6 +22,7 @@
  *--------------------------------------------------------------------------------------------*/
 import './theia-extra';
 import './theia-proposed';
+import './notebookCellExecutionState';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable max-len */
