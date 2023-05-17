@@ -193,7 +193,13 @@ import {
     TextDiffTabInput,
     TextMergeTabInput,
     WebviewEditorTabInput,
-    DocumentPasteEdit
+    DocumentPasteEdit,
+    TestResultState,
+    CoveredCount,
+    FileCoverage,
+    StatementCoverage,
+    BranchCoverage,
+    FunctionCoverage
 } from './types-impl';
 import { AuthenticationExtImpl } from './authentication-ext';
 import { SymbolKind } from '../common/plugin-api-rpc-model';
@@ -239,6 +245,7 @@ import { FilePermission } from '@theia/filesystem/lib/common/files';
 import { TabsExtImpl } from './tabs';
 import { LocalizationExtImpl } from './localization-ext';
 import { TelemetryExtImpl } from './telemetry-ext';
+import { TestingExtImpl } from './tests';
 
 export function createAPIFactory(
     rpc: RPCProtocol,
@@ -281,6 +288,7 @@ export function createAPIFactory(
     const customEditorExt = rpc.set(MAIN_RPC_CONTEXT.CUSTOM_EDITORS_EXT, new CustomEditorsExtImpl(rpc, documents, webviewExt, workspaceExt));
     const webviewViewsExt = rpc.set(MAIN_RPC_CONTEXT.WEBVIEW_VIEWS_EXT, new WebviewViewsExtImpl(rpc, webviewExt));
     const telemetryExt = rpc.set(MAIN_RPC_CONTEXT.TELEMETRY_EXT, new TelemetryExtImpl());
+    const testingExt = rpc.set(MAIN_RPC_CONTEXT.TESTING_EXT, new TestingExtImpl(rpc, commandRegistry, editorsAndDocumentsExt));
     rpc.set(MAIN_RPC_CONTEXT.DEBUG_EXT, debugExt);
 
     return function (plugin: InternalPlugin): typeof theia {
@@ -939,6 +947,9 @@ export function createAPIFactory(
         // Tests API (@stubbed)
         // The following implementation is temporarily `@stubbed` and marked as such under `theia.d.ts`
         const tests: typeof theia.tests = {
+            // createTestController(provider: string, label: string, refreshHandler?: (token: theia.CancellationToken) => Thenable<void> | void) {
+            //     return testingExt.createTestController(provider, label, refreshHandler);
+            // },
             createTestController(
                 provider,
                 controllerLabel: string,
@@ -957,6 +968,18 @@ export function createAPIFactory(
                     dispose: () => undefined,
                 };
             },
+            createTestObserver() {
+                return testingExt.createTestObserver();
+            },
+            runTests(provider: theia.TestRunRequest) {
+                return testingExt.runTests(provider);
+            },
+            get onDidChangeTestResults() {
+                return testingExt.onResultsChanged;
+            },
+            get testResults() {
+                return testingExt.results;
+            }
         };
         /* End of Tests API */
 
@@ -1354,6 +1377,12 @@ export function createAPIFactory(
             TerminalLocation,
             TerminalExitReason,
             DocumentPasteEdit
+            TestResultState,
+            CoveredCount,
+            FileCoverage,
+            StatementCoverage,
+            BranchCoverage,
+            FunctionCoverage
         };
     };
 }
