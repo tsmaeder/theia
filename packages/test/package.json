@@ -1,9 +1,9 @@
 {
   "name": "@theia/test",
-  "version": "1.37.0",
+  "version": "1.39.0",
   "description": "Theia - Test Extension",
   "dependencies": {
-    "@theia/core": "1.37.0"
+    "@theia/core": "1.39.0"
   },
   "publishConfig": {
     "access": "public"
@@ -36,7 +36,7 @@
     "watch": "theiaext watch"
   },
   "devDependencies": {
-    "@theia/ext-scripts": "1.37.0"
+    "@theia/ext-scripts": "1.39.0"
   },
   "nyc": {
     "extends": "../../configs/nyc.json"

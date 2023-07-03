@@ -11,9 +11,15 @@
 // with the GNU Classpath Exception which is available at
 // https://www.gnu.org/software/classpath/license.html.
 //
-// SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
+// SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-only WITH Classpath-exception-2.0
 // *****************************************************************************
-import { Disposable, URI } from '@theia/core/lib/common';
+
+import { ContributionProvider, Disposable, Emitter, Event } from '@theia/core/lib/common';
+import { Location, Range } from '@theia/core/shared/vscode-languageserver-protocol';
+import { CollectionDelta, TreeDelta } from './tree-delta';
+import { MarkdownString } from '@theia/core/lib/common/markdown-rendering';
+import URI from '@theia/core/lib/common/uri';
+import { inject, injectable, named, postConstruct } from '@theia/core/shared/inversify';
 
 export enum TestRunProfileKind {
     Run = 1,
@@ -24,8 +30,15 @@ export enum TestRunProfileKind {
 export interface TestRunProfile {
     readonly kind: TestRunProfileKind;
     readonly isDefault: boolean;
+    readonly tags: string;
     run(): void;
     configure(): void;
+}
+
+export interface OutputEvent {
+    readonly output: string;
+    readonly location?: Location;
+    readonly test?: TestItem;
 }
 
 export interface TestRun {
@@ -39,7 +52,14 @@ export interface TestRun {
     readonly errors: TestFailure[];
     readonly passed: TestSuccess[];
 
-    // output?
+    readonly onQueued: Event<TestItem>;
+    readonly onStarted: Event<TestItem>;
+    readonly onSkipped: Event<TestItem>;
+    readonly onFailed: Event<TestFailure>;
+    readonly onErrored: Event<TestFailure>;
+    readonly onPassed: Event<TestSuccess>;
+
+    readonly onOutput: Event<OutputEvent>;
 }
 
 export interface TestFailure {
@@ -56,32 +76,70 @@ export interface TestSuccess {
 export interface TestMessage {
     readonly expected?: string;
     readonly actual?: string;
-    // readonly location: Location;
-    readonly message: string; // | MarkdownString;
+    readonly location: Location;
+    readonly message: string | MarkdownString;
 }
 
 export interface TestItem {
     readonly id: string;
     readonly label: string;
-    // readonly range: Range;
+    readonly range: Range;
     readonly sortKey?: string;
     readonly tags: string[];
     readonly uri: URI;
     readonly busy: boolean;
     readonly canResolveChildren: boolean;
-    readonly children: TestItem[];
+    readonly children: readonly TestItem[];
     readonly description?: string;
-    readonly error?: string; // | MarkdownString
+    readonly error?: string | MarkdownString
 }
 
 export interface TestController {
     readonly id: string;
     readonly label: string;
-    readonly tests: TestItem[];
-    readonly testRunProfiles: TestRunProfile[];
-    readonly testRuns: TestRun[];
+    readonly tests: readonly TestItem[];
+    readonly testRunProfiles: readonly TestRunProfile[];
+    readonly testRuns: readonly TestRun[];
+
+    readonly onItemsChanged: Event<TreeDelta<string, TestItem>[]>;
+    readonly onRunsChanged: Event<CollectionDelta<TestRun, TestRun>>;
+    readonly onProfilesChanged: Event<CollectionDelta<TestRunProfile, TestRunProfile>>;
 }
 
 export interface TestService {
     registerTestController(controller: TestController): Disposable;
+    onControllersChanged: Event<CollectionDelta<string, TestController>>;
+}
+
+export const TestContribution = Symbol('TestContribution');
+
+export interface TestContribution {
+    registerTestControllers(service: TestService): void;
+}
+
+@injectable()
+export class DefaultTestService implements TestService {
+    private controllers: Map<string, TestController> = new Map();
+    private onControllersChangedEmitter = new Emitter<CollectionDelta<string, TestController>>();
+
+    @inject(ContributionProvider) @named(TestContribution)
+    protected readonly contributionProvider: ContributionProvider<TestContribution>;
+
+    @postConstruct()
+    protected registerContributions(): void {
+        this.contributionProvider.getContributions().forEach(contribution => contribution.registerTestControllers(this));
+    }
+
+    onControllersChanged: Event<CollectionDelta<string, TestController>> = this.onControllersChangedEmitter.event;
+
+    registerTestController(controller: TestController): Disposable {
+        if (this.controllers.has(controller.id)) {
+            throw new Error('TestController already registered: ' + controller.id);
+        }
+        this.onControllersChangedEmitter.fire({ added: [controller] });
+        return Disposable.create(() => {
+            this.controllers.delete(controller.id);
+            this.onControllersChangedEmitter.fire({ removed: [controller.id] });
+        });
+    }
 }
