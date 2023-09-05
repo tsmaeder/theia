@@ -15728,6 +15728,8 @@ export module '@theia/plugin' {
         export function registerNotebookCellStatusBarItemProvider(notebookType: string, provider: NotebookCellStatusBarItemProvider): Disposable;
     }
 
+    // based on VS Code API 1.81.0
+
     /**
      * Namespace for testing functionality. Tests are published by registering
      * {@link TestController} instances, then adding {@link TestItem TestItems}.
@@ -15741,7 +15743,6 @@ export module '@theia/plugin' {
          * @param id Identifier for the controller, must be globally unique.
          * @param label A human-readable label for the controller.
          * @returns An instance of the {@link TestController}.
-         * @stubbed
          */
         export function createTestController(id: string, label: string): TestController;
     }
@@ -15786,14 +15787,12 @@ export module '@theia/plugin' {
          * normally and the user requests to re-run them in debug mode, the editor
          * will attempt use a configuration with the same label of the `Debug`
          * kind. If there is no such configuration, the default will be used.
-         * @stubbed
          */
         label: string;
 
         /**
          * Configures what kind of execution this profile controls. If there
          * are no profiles for a kind, it will not be available in the UI.
-         * @stubbed
          */
         readonly kind: TestRunProfileKind;
 
@@ -15803,7 +15802,6 @@ export module '@theia/plugin' {
          * the generic "run all" button, then the default profile for
          * {@link TestRunProfileKind.Run} will be executed, although the
          * user can configure this.
-         * @stubbed
          */
         isDefault: boolean;
 
@@ -15811,14 +15809,12 @@ export module '@theia/plugin' {
          * Whether this profile supports continuous running of requests. If so,
          * then {@link TestRunRequest.continuous} may be set to `true`. Defaults
          * to false.
-         * @stubbed
          */
         supportsContinuousRun: boolean;
 
         /**
          * Associated tag for the profile. If this is set, only {@link TestItem}
          * instances with the same tag will be eligible to execute in this profile.
-         * @stubbed
          */
         tag: TestTag | undefined;
 
@@ -15827,7 +15823,6 @@ export module '@theia/plugin' {
          * UI, and this method will be invoked when it's clicked. When called,
          * you can take other editor actions, such as showing a quick pick or
          * opening a configuration file.
-         * @stubbed
          */
         configureHandler: (() => void) | undefined;
 
@@ -15847,13 +15842,11 @@ export module '@theia/plugin' {
          * test run. If cancellation is requested on this token, all {@link TestRun}
          * instances associated with the request will be
          * automatically cancelled as well.
-         * @stubbed
          */
         runHandler: (request: TestRunRequest, token: CancellationToken) => Thenable<void> | void;
 
         /**
          * Deletes the run profile.
-         * @stubbed
          */
         dispose(): void;
     }
@@ -15866,15 +15859,13 @@ export module '@theia/plugin' {
      */
     export interface TestController {
         /**
-         * The id of the controller passed in {@link vscode.tests.createTestController}.
+         * The id of the controller passed in {@link tests.createTestController}.
          * This must be globally unique.
-         * @stubbed
          */
         readonly id: string;
 
         /**
          * Human-readable label for the test controller.
-         * @stubbed
          */
         label: string;
 
@@ -15884,12 +15875,11 @@ export module '@theia/plugin' {
          * "test tree."
          *
          * The extension controls when to add tests. For example, extensions should
-         * add tests for a file when {@link vscode.workspace.onDidOpenTextDocument}
+         * add tests for a file when {@link workspace.onDidOpenTextDocument}
          * fires in order for decorations for tests within a file to be visible.
          *
          * However, the editor may sometimes explicitly request children using the
          * {@link resolveHandler} See the documentation on that method for more details.
-         * @stubbed
          */
         readonly items: TestItemCollection;
 
@@ -15904,7 +15894,6 @@ export module '@theia/plugin' {
          * @param supportsContinuousRun Whether the profile supports continuous running.
          * @returns An instance of a {@link TestRunProfile}, which is automatically
          * associated with this controller.
-         * @stubbed
          */
         createRunProfile(label: string, kind: TestRunProfileKind, runHandler: (request: TestRunRequest, token: CancellationToken) => Thenable<void> | void, isDefault?: boolean, tag?: TestTag, supportsContinuousRun?: boolean): TestRunProfile;
 
@@ -15912,7 +15901,7 @@ export module '@theia/plugin' {
          * A function provided by the extension that the editor may call to request
          * children of a test item, if the {@link TestItem.canResolveChildren} is
          * `true`. When called, the item should discover children and call
-         * {@link vscode.tests.createTestItem} as children are discovered.
+         * {@link TestController.createTestItem} as children are discovered.
          *
          * Generally the extension manages the lifecycle of test items, but under
          * certain conditions the editor may request the children of a specific
@@ -15925,7 +15914,6 @@ export module '@theia/plugin' {
          *
          * @param item An unresolved test item for which children are being
          * requested, or `undefined` to resolve the controller's initial {@link TestController.items items}.
-         * @stubbed
          */
         resolveHandler?: (item: TestItem | undefined) => Thenable<void> | void;
 
@@ -15939,7 +15927,6 @@ export module '@theia/plugin' {
          * a {@link FileSystemWatcher} for example, and use this method as a fallback.
          *
          * @returns A thenable that resolves when tests have been refreshed.
-         * @stubbed
          */
         refreshHandler: ((token: CancellationToken) => Thenable<void> | void) | undefined;
 
@@ -15963,7 +15950,6 @@ export module '@theia/plugin' {
          * a file already saved externally, such as a coverage information file.
          * @returns An instance of the {@link TestRun}. It will be considered "running"
          * from the moment this method is invoked until {@link TestRun.end} is called.
-         * @stubbed
          */
         createTestRun(request: TestRunRequest, name?: string, persist?: boolean): TestRun;
 
@@ -15976,23 +15962,39 @@ export module '@theia/plugin' {
          * in the {@link TestItemCollection} it's added to.
          * @param label Human-readable label of the test item.
          * @param uri URI this TestItem is associated with. May be a file or directory.
-         * @stubbed
          */
         createTestItem(id: string, label: string, uri?: Uri): TestItem;
 
         /**
+         * Marks an item's results as being outdated. This is commonly called when
+         * code or configuration changes and previous results should no longer
+         * be considered relevant. The same logic used to mark results as outdated
+         * may be used to drive {@link TestRunRequest.continuous continuous test runs}.
+         *
+         * If an item is passed to this method, test results for the item and all of
+         * its children will be marked as outdated. If no item is passed, then all
+         * test owned by the TestController will be marked as outdated.
+         *
+         * Any test runs started before the moment this method is called, including
+         * runs which may still be ongoing, will be marked as outdated and deprioritized
+         * in the editor's UI.
+         *
+         * @param item Item to mark as outdated. If undefined, all the controller's items are marked outdated.
+         */
+        invalidateTestResults(items?: TestItem | readonly TestItem[]): void;
+
+        /**
          * Unregisters the test controller, disposing of its associated tests
          * and unpersisted results.
-         * @stubbed
          */
         dispose(): void;
     }
 
     /**
      * A TestRunRequest is a precursor to a {@link TestRun}, which in turn is
-     * created by passing a request to {@link tests.runTests}. The TestRunRequest
-     * contains information about which tests should be run, which should not be
-     * run, and how they are run (via the {@link TestRunRequest.profile profile}).
+     * created by passing a request to {@link TestController.createTestRun}. The
+     * TestRunRequest contains information about which tests should be run, which
+     * should not be run, and how they are run (via the {@link TestRunRequest.profile profile}).
      *
      * In general, TestRunRequests are created by the editor and pass to
      * {@link TestRunProfile.runHandler}, however you can also create test
@@ -16042,48 +16044,43 @@ export module '@theia/plugin' {
     }
 
     /**
-     * Options given to {@link TestController.runTests}
+     * A TestRun represents an in-progress or completed test run and
+     * provides methods to report the state of individual tests in the run.
      */
     export interface TestRun {
         /**
          * The human-readable name of the run. This can be used to
          * disambiguate multiple sets of results in a test run. It is useful if
          * tests are run across multiple platforms, for example.
-         * @stubbed
          */
         readonly name: string | undefined;
 
         /**
          * A cancellation token which will be triggered when the test run is
          * canceled from the UI.
-         * @stubbed
          */
         readonly token: CancellationToken;
 
         /**
          * Whether the test run will be persisted across reloads by the editor.
-         * @stubbed
          */
         readonly isPersisted: boolean;
 
         /**
          * Indicates a test is queued for later execution.
          * @param test Test item to update.
-         * @stubbed
          */
         enqueued(test: TestItem): void;
 
         /**
          * Indicates a test has started running.
          * @param test Test item to update.
-         * @stubbed
          */
         started(test: TestItem): void;
 
         /**
          * Indicates a test has been skipped.
          * @param test Test item to update.
-         * @stubbed
          */
         skipped(test: TestItem): void;
 
@@ -16093,7 +16090,6 @@ export module '@theia/plugin' {
          * @param test Test item to update.
          * @param message Messages associated with the test failure.
          * @param duration How long the test took to execute, in milliseconds.
-         * @stubbed
          */
         failed(test: TestItem, message: TestMessage | readonly TestMessage[], duration?: number): void;
 
@@ -16105,7 +16101,6 @@ export module '@theia/plugin' {
          * @param test Test item to update.
          * @param message Messages associated with the test failure.
          * @param duration How long the test took to execute, in milliseconds.
-         * @stubbed
          */
         errored(test: TestItem, message: TestMessage | readonly TestMessage[], duration?: number): void;
 
@@ -16113,27 +16108,25 @@ export module '@theia/plugin' {
          * Indicates a test has passed.
          * @param test Test item to update.
          * @param duration How long the test took to execute, in milliseconds.
-         * @stubbed
          */
         passed(test: TestItem, duration?: number): void;
 
         /**
          * Appends raw output from the test runner. On the user's request, the
          * output will be displayed in a terminal. ANSI escape sequences,
-         * such as colors and text styles, are supported.
+         * such as colors and text styles, are supported. New lines must be given
+         * as CRLF (`\r\n`) rather than LF (`\n`).
          *
          * @param output Output text to append.
          * @param location Indicate that the output was logged at the given
          * location.
          * @param test Test item to associate the output with.
-         * @stubbed
          */
         appendOutput(output: string, location?: Location, test?: TestItem): void;
 
         /**
-         * Signals that the end of the test run. Any tests included in the run whose
+         * Signals the end of the test run. Any tests included in the run whose
          * states have not been updated will have their state reset.
-         * @stubbed
          */
         end(): void;
     }
@@ -16145,14 +16138,12 @@ export module '@theia/plugin' {
     export interface TestItemCollection extends Iterable<[id: string, testItem: TestItem]> {
         /**
          * Gets the number of items in the collection.
-         * @stubbed
          */
         readonly size: number;
 
         /**
          * Replaces the items stored by the collection.
          * @param items Items to store.
-         * @stubbed
          */
         replace(items: readonly TestItem[]): void;
 
@@ -16161,7 +16152,6 @@ export module '@theia/plugin' {
          *
          * @param callback Function to execute for each entry.
          * @param thisArg The `this` context used when invoking the handler function.
-         * @stubbed
          */
         forEach(callback: (item: TestItem, collection: TestItemCollection) => unknown, thisArg?: any): void;
 
@@ -16169,14 +16159,12 @@ export module '@theia/plugin' {
          * Adds the test item to the children. If an item with the same ID already
          * exists, it'll be replaced.
          * @param item Item to add.
-         * @stubbed
          */
         add(item: TestItem): void;
 
         /**
          * Removes a single test item from the collection.
          * @param itemId Item ID to delete.
-         * @stubbed
          */
         delete(itemId: string): void;
 
@@ -16184,7 +16172,6 @@ export module '@theia/plugin' {
          * Efficiently gets a test item by ID, if it exists, in the children.
          * @param itemId Item ID to get.
          * @returns The found item or undefined if it does not exist.
-         * @stubbed
          */
         get(itemId: string): TestItem | undefined;
     }
@@ -16201,20 +16188,17 @@ export module '@theia/plugin' {
          * test results and tests in the document with those in the workspace
          * (test explorer). This cannot change for the lifetime of the `TestItem`,
          * and must be unique among its parent's direct children.
-         * @stubbed
          */
         readonly id: string;
 
         /**
          * URI this `TestItem` is associated with. May be a file or directory.
-         * @stubbed
          */
         readonly uri: Uri | undefined;
 
         /**
          * The children of this test item. For a test suite, this may contain the
          * individual test cases or nested suites.
-         * @stubbed
          */
         readonly children: TestItemCollection;
 
@@ -16222,14 +16206,12 @@ export module '@theia/plugin' {
          * The parent of this item. It's set automatically, and is undefined
          * top-level items in the {@link TestController.items} and for items that
          * aren't yet included in another item's {@link TestItem.children children}.
-         * @stubbed
          */
         readonly parent: TestItem | undefined;
 
         /**
          * Tags associated with this test item. May be used in combination with
-         * {@link TestRunProfile.tags}, or simply as an organizational feature.
-         * @stubbed
+         * {@link TestRunProfile.tag tags}, or simply as an organizational feature.
          */
         tags: readonly TestTag[];
 
@@ -16241,7 +16223,6 @@ export module '@theia/plugin' {
          * to be invoked with the item.
          *
          * Default to `false`.
-         * @stubbed
          */
         canResolveChildren: boolean;
 
@@ -16250,19 +16231,16 @@ export module '@theia/plugin' {
          * This is useful for showing status while discovering children.
          *
          * Defaults to `false`.
-         * @stubbed
          */
         busy: boolean;
 
         /**
          * Display name describing the test case.
-         * @stubbed
          */
         label: string;
 
         /**
          * Optional description that appears next to the label.
-         * @stubbed
          */
         description?: string;
 
@@ -16270,7 +16248,6 @@ export module '@theia/plugin' {
          * A string that should be used when comparing this item
          * with other items. When `falsy` the {@link TestItem.label label}
          * is used.
-         * @stubbed
          */
         sortText?: string | undefined;
 
@@ -16278,7 +16255,6 @@ export module '@theia/plugin' {
          * Location of the test item in its {@link TestItem.uri uri}.
          *
          * This is only meaningful if the `uri` points to a file.
-         * @stubbed
          */
         range: Range | undefined;
 
@@ -16287,7 +16263,6 @@ export module '@theia/plugin' {
          *
          * Note that this is not a test result and should only be used to represent errors in
          * test discovery, such as syntax errors.
-         * @stubbed
          */
         error: string | MarkdownString | undefined;
     }
@@ -16331,7 +16306,6 @@ export module '@theia/plugin' {
          */
         constructor(message: string | MarkdownString);
     }
-
     /**
      * Thenable is a common denominator between ES6 promises, Q, jquery.Deferred, WinJS.Promise,
      * and others. This API makes no assumption about what promise library is being used which
@@ -16348,5 +16322,4 @@ export module '@theia/plugin' {
         then<TResult>(onfulfilled?: (value: T) => TResult | Thenable<TResult>, onrejected?: (reason: any) => TResult | Thenable<TResult>): Thenable<TResult>;
         then<TResult>(onfulfilled?: (value: T) => TResult | Thenable<TResult>, onrejected?: (reason: any) => void): Thenable<TResult>;
     }
-
 }

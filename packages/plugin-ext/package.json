@@ -27,7 +27,7 @@
     "@theia/search-in-workspace": "1.41.0",
     "@theia/task": "1.41.0",
     "@theia/terminal": "1.41.0",
-    "@theia/test": "1.39.0",
+    "@theia/test": "1.41.0",
     "@theia/timeline": "1.41.0",
     "@theia/typehierarchy": "1.41.0",
     "@theia/variable-resolver": "1.41.0",
