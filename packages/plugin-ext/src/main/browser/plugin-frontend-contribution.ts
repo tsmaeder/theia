@@ -22,6 +22,7 @@ import { TreeViewWidget } from './view/tree-view-widget';
 import { CompositeTreeNode, Widget, codicon } from '@theia/core/lib/browser';
 import { TabBarToolbarContribution, TabBarToolbarRegistry } from '@theia/core/lib/browser/shell/tab-bar-toolbar';
 import { PluginViewWidget } from './view/plugin-view-widget';
+import { ViewContextKeyService } from './view/view-context-key-service';
 
 @injectable()
 export class PluginApiFrontendContribution implements CommandContribution, TabBarToolbarContribution {
@@ -35,7 +36,21 @@ export class PluginApiFrontendContribution implements CommandContribution, TabBa
         label: 'Collapse All'
     });
 
+    @inject(ViewContextKeyService)
+    private readonly viewContextKeys: ViewContextKeyService;
+
     registerCommands(commands: CommandRegistry): void {
+        commands.registerCommand({
+            id: 'debug context keys',
+            label: 'Debug context keys'
+        }, {
+            execute: () => {
+                console.log(`activeViewlet: ${this.viewContextKeys.activeViewlet.get()}`);
+                console.log(`activePanel: ${this.viewContextKeys.activePanel.get()}`);
+                console.log(`activeAuxiliary: ${this.viewContextKeys.activeAuxiliary.get()}`);
+            }
+        });
+
         commands.registerCommand(OpenUriCommandHandler.COMMAND_METADATA, {
             execute: (arg: URI) => this.openUriCommandHandler.execute(arg),
             isVisible: () => false

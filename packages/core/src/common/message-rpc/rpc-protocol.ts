@@ -54,11 +54,12 @@ export interface RpcProtocolOptions {
  * The bi-directional mode can be reconfigured using the {@link RpcProtocolOptions} to construct an RPC protocol instance that acts only as client or server instead.
  */
 export class RpcProtocol {
+    private static instanceCounter = 0;
     static readonly CANCELLATION_TOKEN_KEY = 'add.cancellation.token';
 
     protected readonly pendingRequests: Map<number, Deferred<any>> = new Map();
 
-    protected nextMessageId: number = 0;
+    protected static nextMessageId: number = 0;
 
     protected readonly encoder: RpcMessageEncoder;
     protected readonly decoder: RpcMessageDecoder;
@@ -66,6 +67,8 @@ export class RpcProtocol {
 
     protected readonly onNotificationEmitter: Emitter<{ method: string; args: any[]; }> = new Emitter();
     protected readonly cancellationTokenSources = new Map<number, CancellationTokenSource>();
+    private id: number;
+    private disposed: boolean;
 
     get onNotification(): Event<{ method: string; args: any[]; }> {
         return this.onNotificationEmitter.event;
@@ -74,11 +77,15 @@ export class RpcProtocol {
     protected toDispose = new DisposableCollection();
 
     constructor(public readonly channel: Channel, public readonly requestHandler: RequestHandler | undefined, options: RpcProtocolOptions = {}) {
+        this.id = RpcProtocol.instanceCounter++;
         this.encoder = options.encoder ?? new MsgPackMessageEncoder();
         this.decoder = options.decoder ?? new MsgPackMessageDecoder();
         this.toDispose.push(this.onNotificationEmitter);
+        this.toDispose.push(Disposable.create(() => this.disposed = true));
         channel.onClose(event => {
-            this.pendingRequests.forEach(pending => pending.reject(new Error(event.reason)));
+            this.pendingRequests.forEach(pending => {
+                pending.reject(new Error(event.reason));
+            });
             this.pendingRequests.clear();
             this.toDispose.dispose();
         });
@@ -98,7 +105,7 @@ export class RpcProtocol {
                     return;
                 }
                 case RpcMessageType.Request: {
-                    this.handleRequest(message.id, message.method, message.args);
+                    this.handleRequest(message.senderId, message.id, message.method, message.args);
                     return;
                 }
                 case RpcMessageType.Notification: {
@@ -110,11 +117,11 @@ export class RpcProtocol {
         if (this.mode !== 'serverOnly') {
             switch (message.type) {
                 case RpcMessageType.Reply: {
-                    this.handleReply(message.id, message.res);
+                    this.handleReply(message.senderId, message.id, message.res);
                     return;
                 }
                 case RpcMessageType.ReplyErr: {
-                    this.handleReplyErr(message.id, message.err);
+                    this.handleReplyErr(message.senderId, message.id, message.err);
                     return;
                 }
             }
@@ -123,23 +130,29 @@ export class RpcProtocol {
         console.warn(`Received message incompatible with this RPCProtocol's mode '${this.mode}'. Type: ${message.type}. ID: ${message.id}.`);
     }
 
-    protected handleReply(id: number, value: any): void {
+    protected handleReply(senderId: number, id: number, value: any): void {
+        if (this.disposed) {
+            throw new Error('This protocol is disposed');
+        }
         const replyHandler = this.pendingRequests.get(id);
         if (replyHandler) {
             this.pendingRequests.delete(id);
             replyHandler.resolve(value);
         } else {
-            throw new Error(`No reply handler for reply with id: ${id}`);
+            throw new Error(`No reply handler on protocol ${this.id} for reply with id: ${id} from ${senderId}`);
         }
     }
 
-    protected handleReplyErr(id: number, error: any): void {
+    protected handleReplyErr(senderId: number, id: number, error: any): void {
+        if (this.disposed) {
+            throw new Error('This protocol is disposed');
+        }
         const replyHandler = this.pendingRequests.get(id);
         if (replyHandler) {
             this.pendingRequests.delete(id);
             replyHandler.reject(error);
         } else {
-            throw new Error(`No reply handler for error reply with id: ${id}`);
+            throw new Error(`No reply handler on protocol ${this.id} for error reply with id: ${id} from ${senderId}`);
         }
     }
 
@@ -148,7 +161,7 @@ export class RpcProtocol {
         // args array and the `CANCELLATION_TOKEN_KEY` string instead.
         const cancellationToken: CancellationToken | undefined = args.length && CancellationToken.is(args[args.length - 1]) ? args.pop() : undefined;
 
-        const id = this.nextMessageId++;
+        const id = RpcProtocol.nextMessageId++;
         const reply = new Deferred<T>();
 
         if (cancellationToken) {
@@ -158,7 +171,7 @@ export class RpcProtocol {
         this.pendingRequests.set(id, reply);
 
         const output = this.channel.getWriteBuffer();
-        this.encoder.request(output, id, method, args);
+        this.encoder.request(output, this.id, id, method, args);
         output.commit();
 
         if (cancellationToken?.isCancellationRequested) {
@@ -179,7 +192,7 @@ export class RpcProtocol {
         }
 
         const output = this.channel.getWriteBuffer();
-        this.encoder.notification(output, method, args, this.nextMessageId++);
+        this.encoder.notification(output, method, args, RpcProtocol.nextMessageId++);
         output.commit();
     }
 
@@ -196,7 +209,7 @@ export class RpcProtocol {
         }
     }
 
-    protected async handleRequest(id: number, method: string, args: any[]): Promise<void> {
+    protected async handleRequest(senderId: number, id: number, method: string, args: any[]): Promise<void> {
         const output = this.channel.getWriteBuffer();
 
         // Check if the last argument of the received args is the key for indicating that a cancellation token should be used
@@ -211,7 +224,7 @@ export class RpcProtocol {
         try {
             const result = await this.requestHandler!(method, args);
             this.cancellationTokenSources.delete(id);
-            this.encoder.replyOK(output, id, result);
+            this.encoder.replyOK(output, senderId, id, result);
             output.commit();
         } catch (err) {
             // In case of an error the output buffer might already contains parts of an message.
@@ -221,7 +234,7 @@ export class RpcProtocol {
             }
             const errorOutput = this.channel.getWriteBuffer();
             this.cancellationTokenSources.delete(id);
-            this.encoder.replyErr(errorOutput, id, err);
+            this.encoder.replyErr(errorOutput, senderId, id, err);
             errorOutput.commit();
         }
     }

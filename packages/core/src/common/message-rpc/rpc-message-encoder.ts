@@ -44,6 +44,7 @@ export interface CancelMessage {
 
 export interface RequestMessage {
     type: RpcMessageType.Request;
+    senderId: number;
     id: number;
     method: string;
     args: any[];
@@ -58,12 +59,14 @@ export interface NotificationMessage {
 
 export interface ReplyMessage {
     type: RpcMessageType.Reply;
+    senderId: number;
     id: number;
     res: any;
 }
 
 export interface ReplyErrMessage {
     type: RpcMessageType.ReplyErr;
+    senderId: number,
     id: number;
     err: any;
 }
@@ -113,11 +116,11 @@ export interface RpcMessageEncoder {
 
     notification(buf: WriteBuffer, method: string, args: any[], id?: number): void
 
-    request(buf: WriteBuffer, requestId: number, method: string, args: any[]): void
+    request(buf: WriteBuffer, senderId: number, requestId: number, method: string, args: any[]): void
 
-    replyOK(buf: WriteBuffer, requestId: number, res: any): void
+    replyOK(buf: WriteBuffer, senderId: number, requestId: number, res: any): void
 
-    replyErr(buf: WriteBuffer, requestId: number, err: any): void
+    replyErr(buf: WriteBuffer, senderId: number, requestId: number, err: any): void
 
 }
 
@@ -133,14 +136,14 @@ export class MsgPackMessageEncoder implements RpcMessageEncoder {
     notification(buf: WriteBuffer, method: string, args: any[], id?: number): void {
         this.encode<NotificationMessage>(buf, { type: RpcMessageType.Notification, method, args, id });
     }
-    request(buf: WriteBuffer, requestId: number, method: string, args: any[]): void {
-        this.encode<RequestMessage>(buf, { type: RpcMessageType.Request, id: requestId, method, args });
+    request(buf: WriteBuffer, senderId: number, requestId: number, method: string, args: any[]): void {
+        this.encode<RequestMessage>(buf, { type: RpcMessageType.Request, senderId: senderId, id: requestId, method, args });
     }
-    replyOK(buf: WriteBuffer, requestId: number, res: any): void {
-        this.encode<ReplyMessage>(buf, { type: RpcMessageType.Reply, id: requestId, res });
+    replyOK(buf: WriteBuffer, senderId: number, requestId: number, res: any): void {
+        this.encode<ReplyMessage>(buf, { type: RpcMessageType.Reply, senderId: senderId, id: requestId, res });
     }
-    replyErr(buf: WriteBuffer, requestId: number, err: any): void {
-        this.encode<ReplyErrMessage>(buf, { type: RpcMessageType.ReplyErr, id: requestId, err });
+    replyErr(buf: WriteBuffer, senderId: number, requestId: number, err: any): void {
+        this.encode<ReplyErrMessage>(buf, { type: RpcMessageType.ReplyErr, senderId: senderId, id: requestId, err });
     }
 
     encode<T = unknown>(buf: WriteBuffer, value: T): void {

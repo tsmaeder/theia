@@ -15,6 +15,7 @@
 // *****************************************************************************
 
 import { ConfirmDialog, QuickInputService } from '@theia/core/lib/browser';
+import { WebSocketConnectionSource } from '@theia/core/lib/browser/messaging/ws-connection-source';
 import {
     Command, CommandContribution, CommandRegistry, MAIN_MENU_BAR,
     MenuContribution, MenuModelRegistry, MenuNode, MessageService, SubMenuOptions
@@ -51,6 +52,11 @@ const SampleQuickInputCommand: Command = {
     label: 'Test Positive Integer'
 };
 
+const reconnectCommand: Command = {
+    id: 'test.reconnect',
+    label: 'Test frontend reconnect'
+};
+
 @injectable()
 export class SampleCommandContribution implements CommandContribution {
 
@@ -60,7 +66,28 @@ export class SampleCommandContribution implements CommandContribution {
     @inject(MessageService)
     protected readonly messageService: MessageService;
 
+    // Test command contribution
+
+    @inject(WebSocketConnectionSource)
+    protected connectionProvider: WebSocketConnectionSource;
+
     registerCommands(commands: CommandRegistry): void {
+        commands.registerCommand(reconnectCommand, {
+            execute: async () => {
+                const timeoutString = await this.quickInputService.input({
+                    value: '500',
+                    validateInput: input => Promise.resolve(Number.parseInt(input) === undefined ? 'not an integer' : undefined)
+                });
+                if (timeoutString) {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    (this.connectionProvider as any).socket.disconnect();
+                    setTimeout(() => {
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        (this.connectionProvider as any).socket.connect();
+                    }, Number.parseInt(timeoutString));
+                }
+            }
+        });
         commands.registerCommand({ id: 'create-quick-pick-sample', label: 'Internal QuickPick' }, {
             execute: () => {
                 const pick = this.quickInputService.createQuickPick();
