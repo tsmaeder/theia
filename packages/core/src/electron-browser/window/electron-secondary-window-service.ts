@@ -27,7 +27,7 @@ export class ElectronSecondaryWindowService extends DefaultSecondaryWindowServic
     protected override doCreateSecondaryWindow(widget: ExtractableWidget, shell: ApplicationShell): Window | undefined {
         const w = super.doCreateSecondaryWindow(widget, shell);
         if (w) {
-            window.electronTheiaCore.setMenuBarVisible(false, w.name);
+            // window.electronTheiaCore.setMenuBarVisible(false, w.name);
             window.electronTheiaCore.setSecondaryWindowCloseRequestHandler(w.name, () => this.canClose(widget, shell));
         }
         return w;
