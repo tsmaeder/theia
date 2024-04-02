@@ -16,9 +16,10 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { PluginIdentifiers, PluginModel, PluginPackage } from '../../../common/plugin-protocol';
+import { PluginModel, PluginPackage } from '../../../common/plugin-protocol';
 import { Endpoint } from '@theia/core/lib/browser/endpoint';
 import URI from '@theia/core/lib/common/uri';
+import { PluginId } from '@theia/installer';
 
 const NLS_REGEX = /^%([\w\d.-]+)%$/i;
 
@@ -55,7 +56,7 @@ function readContents(uri: string): Promise<string> {
 async function readPluginJson(pluginModel: PluginModel, relativePath: string): Promise<any> {
     const content = await readPluginFile(pluginModel, relativePath);
     const json = JSON.parse(content) as PluginPackage;
-    json.publisher ??= PluginIdentifiers.UNPUBLISHED;
+    json.publisher ??= PluginId.UNPUBLISHED;
     return json;
 }
 

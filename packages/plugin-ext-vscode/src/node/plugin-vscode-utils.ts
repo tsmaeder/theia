@@ -16,10 +16,8 @@
 
 import * as decompress from 'decompress';
 import * as path from 'path';
-import * as filenamify from 'filenamify';
-import { FileUri } from '@theia/core/lib/node';
 import * as fs from '@theia/core/shared/fs-extra';
-import { PluginVSCodeEnvironment } from '../common/plugin-vscode-environment';
+import { PluginId } from '@theia/installer';
 
 export async function decompressExtension(sourcePath: string, destPath: string): Promise<boolean> {
     try {
@@ -39,19 +37,14 @@ export async function decompressExtension(sourcePath: string, destPath: string):
     }
 }
 
-export async function existsInDeploymentDir(env: PluginVSCodeEnvironment, extensionId: string): Promise<boolean> {
-    return fs.pathExists(await getExtensionDeploymentDir(env, extensionId));
-}
-
 export const TMP_DIR_PREFIX = 'tmp-vscode-unpacked-';
-export async function unpackToDeploymentDir(env: PluginVSCodeEnvironment, sourcePath: string, extensionId: string): Promise<string> {
-    const extensionDeploymentDir = await getExtensionDeploymentDir(env, extensionId);
+export async function unpackToDeploymentDir(extensionId: PluginId, deploymentDir: string, sourcePath: string, extensiondDirName: string): Promise<string> {
+    const extensionDeploymentDir = path.resolve(deploymentDir, extensiondDirName);
     if (await fs.pathExists(extensionDeploymentDir)) {
-        console.log(`[${extensionId}]: deployment dir "${extensionDeploymentDir}" already exists`);
-        return extensionDeploymentDir;
+        throw new Error(`[${PluginId.toString(extensionId)}]: deployment dir "${extensionDeploymentDir}" already exists`);
     }
 
-    const tempDir = await getTempDir(env, TMP_DIR_PREFIX);
+    const tempDir = await getTempDir(deploymentDir, TMP_DIR_PREFIX);
     try {
         console.log(`[${extensionId}]: trying to decompress "${sourcePath}" into "${tempDir}"...`);
         if (!await decompressExtension(sourcePath, tempDir)) {
@@ -79,15 +72,7 @@ export async function unpackToDeploymentDir(env: PluginVSCodeEnvironment, source
     }
 }
 
-export async function getExtensionDeploymentDir(env: PluginVSCodeEnvironment, extensionId: string): Promise<string> {
-    const deployedPluginsDirUri = await env.getDeploymentDirUri();
-    const normalizedExtensionId = filenamify(extensionId, { replacement: '_' });
-    const extensionDeploymentDirPath = FileUri.fsPath(deployedPluginsDirUri.resolve(normalizedExtensionId));
-    return extensionDeploymentDirPath;
-}
-
-export async function getTempDir(env: PluginVSCodeEnvironment, prefix: string): Promise<string> {
-    const deploymentDirPath = FileUri.fsPath(await env.getDeploymentDirUri());
+export async function getTempDir(deploymentDirPath: string, prefix: string): Promise<string> {
     try {
         if (!await fs.pathExists(deploymentDirPath)) {
             console.log(`Creating deployment dir ${deploymentDirPath}`);

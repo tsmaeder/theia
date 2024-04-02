@@ -20,12 +20,11 @@ import {
     ProgressClient, ProgressService,
     bindContributionProvider
 } from '@theia/core';
-import { MainPluginApiProvider, PluginDeployerDirectoryHandler } from '@theia/plugin-ext';
-import { PluginTheiaHeadlessDirectoryHandler } from './handlers/plugin-theia-headless-directory-handler';
+import { MainPluginApiProvider } from '@theia/plugin-ext';
 import { HeadlessProgressClient } from './headless-progress-client';
 
 export function bindHeadlessMain(bind: interfaces.Bind): void {
-    bind(PluginDeployerDirectoryHandler).to(PluginTheiaHeadlessDirectoryHandler).inSingletonScope();
+
 }
 
 export function bindBackendMain(bind: interfaces.Bind, unbind: interfaces.Unbind, isBound: interfaces.IsBound, rebind: interfaces.Rebind): void {

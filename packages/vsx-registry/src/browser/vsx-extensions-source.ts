@@ -50,34 +50,39 @@ export class VSXExtensionsSource extends TreeSource {
     }
 
     *getElements(): IterableIterator<TreeElement> {
-        for (const id of this.doGetElements()) {
-            const extension = this.model.getExtension(id);
-            if (!extension) {
-                continue;
-            }
-            if (this.options.id === VSXExtensionsSourceOptions.RECOMMENDED) {
-                if (this.model.isInstalled(id)) {
-                    continue;
-                }
-            }
-            if (this.options.id === VSXExtensionsSourceOptions.BUILT_IN) {
-                if (extension.builtin) {
-                    yield extension;
-                }
-            } else if (!extension.builtin) {
-                yield extension;
-            }
-        }
-    }
-
-    protected doGetElements(): IterableIterator<string> {
+        let elements: IterableIterator<string>;
         if (this.options.id === VSXExtensionsSourceOptions.SEARCH_RESULT) {
-            return this.model.searchResult;
+            elements = this.model.searchResult;
         }
         if (this.options.id === VSXExtensionsSourceOptions.RECOMMENDED) {
-            return this.model.recommended;
+            elements = this.model.recommended;
+        } else {
+            elements = this.model.installed;
         }
-        return this.model.installed;
-    }
 
+        for (const id of elements) {
+            const extension = this.model.getExtension(id);
+            if (extension) {
+                if (this.options.id === VSXExtensionsSourceOptions.RECOMMENDED) {
+                    if (extension.isUninstalled || !extension.installed) {
+                        yield extension;
+                    }
+                } else if (this.options.id === VSXExtensionsSourceOptions.BUILT_IN) {
+                    if (extension.builtin) {
+                        yield extension;
+                    }
+                } else if (this.options.id === VSXExtensionsSourceOptions.INSTALLED) {
+                    if (!extension.builtin) {
+                        if (extension.installed && !extension.isUninstalled) {
+                            yield extension;
+                        }
+                    }
+                } else if (this.options.id === VSXExtensionsSourceOptions.SEARCH_RESULT) {
+                    if (!extension.builtin) {
+                        yield extension;
+                    }
+                }
+            }
+        }
+    }
 }

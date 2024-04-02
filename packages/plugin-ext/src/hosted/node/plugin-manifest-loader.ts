@@ -16,8 +16,9 @@
 
 import * as path from 'path';
 import * as fs from '@theia/core/shared/fs-extra';
-import { PluginIdentifiers, PluginPackage } from '../../common';
+import { PluginPackage } from '../../common';
 import { updateActivationEvents } from './plugin-activation-events';
+import { PluginId } from '@theia/installer';
 
 export async function loadManifest(pluginPath: string): Promise<PluginPackage> {
     const manifest = await fs.readJson(path.join(pluginPath, 'package.json'));
@@ -26,7 +27,7 @@ export async function loadManifest(pluginPath: string): Promise<PluginPackage> {
     if (manifest && manifest.name && manifest.name.startsWith(built_prefix)) {
         manifest.name = manifest.name.substring(built_prefix.length);
     }
-    manifest.publisher ??= PluginIdentifiers.UNPUBLISHED;
+    manifest.publisher ??= PluginId.UNPUBLISHED;
     updateActivationEvents(manifest);
     return manifest;
 }

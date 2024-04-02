@@ -19,12 +19,13 @@ import * as fs from '@theia/core/shared/fs-extra';
 import { LazyLocalization, LocalizationProvider } from '@theia/core/lib/node/i18n/localization-provider';
 import { Localization } from '@theia/core/lib/common/i18n/localization';
 import { inject, injectable } from '@theia/core/shared/inversify';
-import { DeployedPlugin, Localization as PluginLocalization, PluginIdentifiers, Translation } from '../../common';
+import { DeployedPlugin, Localization as PluginLocalization, Translation } from '../../common';
 import { EnvVariablesServer } from '@theia/core/lib/common/env-variables';
 import { BackendApplicationContribution } from '@theia/core/lib/node';
 import { Disposable, DisposableCollection, isObject, MaybePromise, nls, Path, URI } from '@theia/core';
 import { Deferred } from '@theia/core/lib/common/promise-util';
 import { LanguagePackBundle, LanguagePackService } from '../../common/language-pack-service';
+import { PluginId } from '@theia/installer';
 
 export interface VSCodeNlsConfig {
     locale: string
@@ -80,7 +81,7 @@ export class HostedPluginLocalizationService implements BackendApplicationContri
             disposable.push(await this.updateLanguagePackBundles(plugin));
         }
         if (!disposable.disposed) {
-            const versionedId = PluginIdentifiers.componentsToVersionedId(plugin.metadata.model);
+            const versionedId = PluginId.toVersionedString(PluginId.fromComponents(plugin.metadata.model));
             disposable.push(Disposable.create(() => {
                 this.localizationDisposeMap.delete(versionedId);
             }));
@@ -88,7 +89,7 @@ export class HostedPluginLocalizationService implements BackendApplicationContri
         }
     }
 
-    undeployLocalizations(plugin: PluginIdentifiers.VersionedId): void {
+    undeployLocalizations(plugin: PluginId.VersionedId): void {
         this.localizationDisposeMap.get(plugin)?.dispose();
     }
 

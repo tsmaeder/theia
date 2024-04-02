@@ -18,12 +18,13 @@ import { LanguageQuickPickItem, LanguageQuickPickService } from '@theia/core/lib
 import { RequestContext, RequestService } from '@theia/core/shared/@theia/request';
 import { inject, injectable } from '@theia/core/shared/inversify';
 import { LanguageInfo } from '@theia/core/lib/common/i18n/localization';
-import { PluginPackage, PluginServer } from '@theia/plugin-ext';
+import { PluginPackage } from '@theia/plugin-ext';
 import { OVSXClientProvider } from '../common/ovsx-client-provider';
 import { VSXSearchEntry } from '@theia/ovsx-client';
-import { VSCodeExtensionUri } from '@theia/plugin-ext-vscode/lib/common/plugin-vscode-uri';
 import { nls } from '@theia/core/lib/common/nls';
 import { MessageService } from '@theia/core/lib/common/message-service';
+import { VSCodeExtensionUri } from '@theia/plugin-ext-vscode/lib/common/vsx-extension-uri';
+import { InstallerBackendService } from '@theia/plugin-management/lib/common/installer-backend-service';
 
 @injectable()
 export class VSXLanguageQuickPickService extends LanguageQuickPickService {
@@ -34,8 +35,8 @@ export class VSXLanguageQuickPickService extends LanguageQuickPickService {
     @inject(RequestService)
     protected readonly requestService: RequestService;
 
-    @inject(PluginServer)
-    protected readonly pluginServer: PluginServer;
+    @inject(InstallerBackendService)
+    protected readonly installerService: InstallerBackendService;
 
     @inject(MessageService)
     protected readonly messageService: MessageService;
@@ -70,13 +71,12 @@ export class VSXLanguageQuickPickService extends LanguageQuickPickService {
                                         localizationContribution.localizedLanguageName ?? localizationContribution.languageName ?? localizationContribution.languageId),
                                 });
                                 try {
-                                    const extensionUri = VSCodeExtensionUri.fromId(`${extension.extension.namespace}.${extension.extension.name}`).toString();
-                                    await this.pluginServer.deploy(extensionUri);
+                                    const extensionUri = VSCodeExtensionUri.fromId({ id: `${extension.extension.namespace}.${extension.extension.name}` }).toString();
+                                    await this.installerService.install([extensionUri], true);
                                 } finally {
                                     progress.cancel();
                                 }
-                            }
-                        });
+                            });
                     }
                 }
             }

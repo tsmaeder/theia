@@ -14,22 +14,23 @@
 // SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-only WITH Classpath-exception-2.0
 // *****************************************************************************
 
-import { RequestContext, RequestService } from '@theia/core/shared/@theia/request';
+import { RequestService } from '@theia/core/shared/@theia/request';
 import { inject, injectable } from '@theia/core/shared/inversify';
 import { Deferred } from '@theia/core/lib/common/promise-util';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import * as url from 'url';
-import { PluginDeployerResolver, PluginDeployerResolverContext } from '../../common';
 import { getTempDirPathAsync } from './temp-dir-util';
+import { DownloadableFileArtifact } from '@theia/plugin-management/lib/node';
+import { ArtifactResolver, DeployableArtifact, PluginId, VersionedPluginId } from '@theia/installer';
 
 /**
  * Resolver that handle the http(s): protocol
- * http://path/to/my.plugin
- * https://path/to/my.plugin
+ * http://path/to/my.plugin@version.theia
+ * https://path/to/my.plugin@version.vsix
  */
 @injectable()
-export class HttpPluginDeployerResolver implements PluginDeployerResolver {
+export class HttpArtifactResolver implements ArtifactResolver {
 
     private unpackedFolder: Deferred<string>;
 
@@ -49,44 +50,26 @@ export class HttpPluginDeployerResolver implements PluginDeployerResolver {
     }
 
     /**
-     * Grab the remote file specified by the given URL
+     * Handle only the plugins that starts with http or https:
      */
-    async resolve(pluginResolverContext: PluginDeployerResolverContext): Promise<void> {
-
-        // download the file
-        // keep filename of the url
-        const urlPath = pluginResolverContext.getOriginId();
-        const link = url.parse(urlPath);
-        if (!link.pathname) {
-            throw new Error('invalid link URI' + urlPath);
-        }
-
-        const dirname = path.dirname(link.pathname);
-        const basename = path.basename(link.pathname);
-        const filename = dirname.replace(/\W/g, '_') + ('-') + basename;
-        const unpackedFolder = await this.unpackedFolder.promise;
-        const unpackedPath = path.resolve(unpackedFolder, path.basename(filename));
-
-        try {
-            await fs.access(unpackedPath);
-            // use of cache. If file is already there use it directly
-            return;
-        } catch { }
-
-        const response = await this.request.request({ url: pluginResolverContext.getOriginId() });
-        if (RequestContext.isSuccess(response)) {
-            await fs.writeFile(unpackedPath, response.buffer);
-            pluginResolverContext.addPlugin(pluginResolverContext.getOriginId(), unpackedPath);
-        } else {
-            throw new Error(`Could not download the plugin from ${pluginResolverContext.getOriginId()}. HTTP status code: ${response.res.statusCode}`);
-        }
-
+    canHandle(pluginId: string): boolean {
+        return /^http[s]?:\/\/.*$/gm.test(pluginId);
     }
 
     /**
-     * Handle only the plugins that starts with http or https:
+     * Grab the remote file specified by the given URL
      */
-    accept(pluginId: string): boolean {
-        return /^http[s]?:\/\/.*$/gm.test(pluginId);
+    async resolve(uri: string): Promise<DeployableArtifact> {
+        const link = url.parse(uri);
+        if (!link.pathname) {
+            throw new Error('invalid link URI' + uri);
+        }
+
+        const basename = path.basename(link.pathname);
+        const id = PluginId.parse(path.basename(link.pathname, path.extname(link.pathname))) as VersionedPluginId;
+        if (!id.version) {
+            throw new Error(`Could not parse versioned it from uri ${uri}`)
+        }
+        return new DownloadableFileArtifact(this.request, await this.unpackedFolder.promise, basename, id as VersionedPluginId, uri);
     }
 }

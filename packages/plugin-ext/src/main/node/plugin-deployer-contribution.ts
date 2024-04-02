@@ -17,7 +17,8 @@
 import { BackendApplicationContribution } from '@theia/core/lib/node';
 import { injectable, inject } from '@theia/core/shared/inversify';
 import { PluginDeployer } from '../../common/plugin-protocol';
-import { ILogger } from '@theia/core';
+import { ILogger, MaybePromise } from '@theia/core';
+import { Application } from '@theia/core/shared/express';
 
 @injectable()
 export class PluginDeployerContribution implements BackendApplicationContribution {
@@ -28,7 +29,11 @@ export class PluginDeployerContribution implements BackendApplicationContributio
     @inject(PluginDeployer)
     protected pluginDeployer: PluginDeployer;
 
-    initialize(): Promise<void> {
+    configure(app: Application): MaybePromise<void> {
+        return this.pluginDeployer.configure();
+    }
+
+    onStart(): Promise<void> {
         this.pluginDeployer.start().catch(error => this.logger.error('Initializing plugin deployer failed.', error));
         return Promise.resolve();
     }

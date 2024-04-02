@@ -315,7 +315,7 @@ export class VSXExtensionsContribution extends AbstractViewContribution<VSXExten
      */
     protected async updateVersion(extension: VSXExtension, updateToVersion: string): Promise<void> {
         try {
-            await extension.install({ version: updateToVersion, ignoreOtherVersions: true });
+            await extension.install(updateToVersion);
         } catch {
             this.messageService.warn(nls.localize('theia/vsx-registry/vsx-extensions-contribution/update-version-version-error', 'Failed to install version {0} of {1}.',
                 updateToVersion, extension.displayName));

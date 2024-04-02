@@ -16,9 +16,10 @@
 
 import { injectable, inject, multiInject, postConstruct, optional } from '@theia/core/shared/inversify';
 import { ILogger, ConnectionErrorHandler } from '@theia/core/lib/common';
-import { HostedPluginClient, PluginModel, ServerPluginRunner, DeployedPlugin, PluginIdentifiers } from '../../common/plugin-protocol';
+import { HostedPluginClient, PluginModel, ServerPluginRunner, DeployedPlugin } from '../../common/plugin-protocol';
 import { LogPart } from '../../common/types';
 import { HostedPluginProcess } from './hosted-plugin-process';
+import { PluginId } from '@theia/installer';
 
 export interface IPCConnectionOptions {
     readonly serverName: string;
@@ -95,7 +96,7 @@ export class HostedPluginSupport {
     /**
      * Provides additional plugin ids.
      */
-    async getExtraDeployedPluginIds(): Promise<PluginIdentifiers.VersionedId[]> {
+    async getExtraDeployedPluginIds(): Promise<PluginId.VersionedId[]> {
         return [].concat.apply([], await Promise.all(this.pluginRunners.map(runner => runner.getExtraDeployedPluginIds())));
     }
 

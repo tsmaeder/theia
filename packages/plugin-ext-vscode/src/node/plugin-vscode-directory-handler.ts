@@ -16,108 +16,68 @@
 
 import * as path from 'path';
 import * as fs from '@theia/core/shared/fs-extra';
-import { inject, injectable } from '@theia/core/shared/inversify';
-import type { RecursivePartial, URI } from '@theia/core';
-import { Deferred, firstTrue } from '@theia/core/lib/common/promise-util';
-import {
-    PluginDeployerDirectoryHandler, PluginDeployerEntry, PluginDeployerDirectoryHandlerContext,
-    PluginDeployerEntryType, PluginPackage, PluginIdentifiers
-} from '@theia/plugin-ext';
-import { PluginCliContribution } from '@theia/plugin-ext/lib/main/node/plugin-cli-contribution';
-import { TMP_DIR_PREFIX } from './plugin-vscode-utils';
+import { injectable } from '@theia/core/shared/inversify';
+
+import { PluginDirectoryLayout, PluginDirectoryLayoutHandler, PluginEngineHandler } from '@theia/plugin-ext/lib/main/node/plugin-directory-layout';
+import { DeployedPlugin, DeploymentKind, DeploymentLocation, PluginHost, PluginId, VersionedPluginId } from '@theia/installer';
+
+export class VSCodePluginDeployerEntry implements DeployedPlugin {
+    protected readonly _types: PluginHost[] = [];
+    constructor(
+        readonly id: VersionedPluginId,
+        readonly location: DeploymentLocation,
+        readonly uri: string,
+        readonly relativePluginRoot: string,
+
+        readonly kind: DeploymentKind,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        protected readonly pkgJson: any,
+        readonly isUnderDevelopment: boolean = false) {
+
+        if (this.pkgJson.main) {
+            this._types.push(PluginHost.BACKEND);
+        }
+        if (this.pkgJson.browser) {
+            this._types.push(PluginHost.FRONTEND);
+        }
+        if (this._types.length === 0) {
+            this._types.push(PluginHost.BACKEND);
+        }
+
+    }
+
+    get types(): readonly PluginHost[] {
+        return this._types;
+    }
+}
 
 @injectable()
-export class PluginVsCodeDirectoryHandler implements PluginDeployerDirectoryHandler {
-
-    protected readonly deploymentDirectory: Deferred<URI>;
-
-    @inject(PluginCliContribution) protected readonly pluginCli: PluginCliContribution;
-
-    async accept(plugin: PluginDeployerEntry): Promise<boolean> {
-        console.debug(`Resolving "${plugin.id()}" as a VS Code extension...`);
-        if (plugin.path().startsWith(TMP_DIR_PREFIX)) {
-            // avoid adding corrupted plugins from temporary directories
-            return false;
-        }
-        return this.attemptResolution(plugin);
-    }
-
-    protected async attemptResolution(plugin: PluginDeployerEntry): Promise<boolean> {
-        if (this.resolvePackage(plugin)) {
-            return true;
-        }
-        return this.deriveMetadata(plugin);
-    }
-
-    protected async deriveMetadata(plugin: PluginDeployerEntry): Promise<boolean> {
-        return firstTrue(
-            this.resolveFromSources(plugin),
-            this.resolveFromVSIX(plugin),
-            this.resolveFromNpmTarball(plugin)
-        );
-    }
-
-    async handle(context: PluginDeployerDirectoryHandlerContext): Promise<void> {
-        const types: PluginDeployerEntryType[] = [];
-        const packageJson: PluginPackage = context.pluginEntry().getValue('package.json');
-        if (packageJson.browser) {
-            types.push(PluginDeployerEntryType.FRONTEND);
-        }
-        if (packageJson.main || !packageJson.browser) {
-            types.push(PluginDeployerEntryType.BACKEND);
-        }
-        context.pluginEntry().accept(...types);
-    }
-
-    protected async resolveFromSources(plugin: PluginDeployerEntry): Promise<boolean> {
-        const pluginPath = plugin.path();
-        const pck = await this.requirePackage(pluginPath);
-        return this.resolvePackage(plugin, { pluginPath, pck });
-    }
-
-    protected async resolveFromVSIX(plugin: PluginDeployerEntry): Promise<boolean> {
-        if (!(await fs.pathExists(path.join(plugin.path(), 'extension.vsixmanifest')))) {
-            return false;
-        }
-        const pluginPath = path.join(plugin.path(), 'extension');
-        const pck = await this.requirePackage(pluginPath);
-        return this.resolvePackage(plugin, { pluginPath, pck });
-    }
-
-    protected async resolveFromNpmTarball(plugin: PluginDeployerEntry): Promise<boolean> {
-        const pluginPath = path.join(plugin.path(), 'package');
-        const pck = await this.requirePackage(pluginPath);
-        return this.resolvePackage(plugin, { pluginPath, pck });
-    }
-
-    protected resolvePackage(plugin: PluginDeployerEntry, options?: {
-        pluginPath: string
-        pck?: RecursivePartial<PluginPackage>
-    }): boolean {
-        const { pluginPath, pck } = options || {
-            pluginPath: plugin.path(),
-            pck: plugin.getValue('package.json')
-        };
-        if (!pck || !pck.name || !pck.version || !pck.engines || !pck.engines.vscode) {
-            return false;
-        }
-        pck.publisher ??= PluginIdentifiers.UNPUBLISHED;
-        if (options) {
-            plugin.storeValue('package.json', pck);
-            plugin.rootPath = plugin.path();
-            plugin.updatePath(pluginPath);
-        }
-        console.debug(`Resolved "${plugin.id()}" to a VS Code extension "${pck.name}@${pck.version}" with engines:`, pck.engines);
-        return true;
-    }
-
-    protected async requirePackage(pluginPath: string): Promise<PluginPackage | undefined> {
+export class VsixDirectoryLayoutHandler implements PluginDirectoryLayoutHandler {
+    async handle(pluginRootPath: string): Promise<PluginDirectoryLayout | undefined> {
         try {
-            const plugin: PluginPackage = await fs.readJSON(path.join(pluginPath, 'package.json'));
-            plugin.publisher ??= PluginIdentifiers.UNPUBLISHED;
-            return plugin;
-        } catch {
+            await fs.access(path.resolve(pluginRootPath, 'extension.vsixmanifest'));
+            await fs.access(path.resolve(pluginRootPath, 'extension/package.json'));
+            return {
+                assetRootPath: path.resolve(pluginRootPath, 'extension'),
+                metadataFilePath: path.resolve(pluginRootPath, 'extension/package.json'),
+            };
+        } catch (e) {
             return undefined;
         }
+    }
+}
+
+@injectable()
+export class VsixEngineHandler implements PluginEngineHandler {
+    async handle(location: DeploymentLocation, rootUri: string, deploymentKind: DeploymentKind, metadataContent: string): Promise<DeployedPlugin | undefined> {
+        const packageJson = JSON.parse(metadataContent);
+        const id = {
+            id: `${packageJson.publisher || PluginId.UNPUBLISHED}.${packageJson.name}`.toLowerCase(),
+            version: packageJson.version
+        };
+        if (packageJson.engines?.vscode) {
+            return new VSCodePluginDeployerEntry(id, location, rootUri, 'extension', deploymentKind, packageJson);
+        }
+        return undefined;
     }
 }

@@ -463,6 +463,9 @@ export abstract class AbstractPluginManagerExtImpl<P extends Record<string, any>
         this.onDidChangeEmitter.fire(undefined);
     }
 
+    async $getDeployedPlugins(): Promise<string[]> {
+        return [...this.registry.keys()];
+    }
 }
 
 @injectable()

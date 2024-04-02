@@ -18,8 +18,8 @@ import { injectable, inject } from '@theia/core/shared/inversify';
 import * as fs from '@theia/core/shared/fs-extra';
 import { FileUri } from '@theia/core/lib/node';
 import { PluginVSCodeEnvironment } from '../common/plugin-vscode-environment';
-import { PluginDeployerParticipant, PluginDeployerStartContext } from '@theia/plugin-ext/lib/common/plugin-protocol';
-import { LocalVSIXFilePluginDeployerResolver } from './local-vsix-file-plugin-deployer-resolver';
+import { PluginDeployerParticipant } from '@theia/plugin-ext/lib/common/plugin-protocol';
+import { InstallerService } from '@theia/plugin-management/lib/node';
 
 @injectable()
 export class PluginVSCodeDeployerParticipant implements PluginDeployerParticipant {
@@ -27,21 +27,19 @@ export class PluginVSCodeDeployerParticipant implements PluginDeployerParticipan
     @inject(PluginVSCodeEnvironment)
     protected readonly environments: PluginVSCodeEnvironment;
 
-    async onWillStart(context: PluginDeployerStartContext): Promise<void> {
-        const extensionDeploymentDirUri = await this.environments.getDeploymentDirUri();
-        context.userEntries.push(extensionDeploymentDirUri.withScheme('local-dir').toString());
+    @inject(InstallerService)
+    protected readonly installerService: InstallerService;
 
+    async onWillStart(): Promise<void> {
         const userExtensionDirUri = await this.environments.getUserExtensionsDirUri();
         const userExtensionDirPath = FileUri.fsPath(userExtensionDirUri);
 
         if (await fs.pathExists(userExtensionDirPath)) {
             const files = await fs.readdir(userExtensionDirPath);
             for (const file of files) {
-                if (file.endsWith(LocalVSIXFilePluginDeployerResolver.FILE_EXTENSION)) {
-                    const extensionUri = userExtensionDirUri.resolve(file).withScheme('local-file').toString();
-                    console.log(`found drop-in extension "${extensionUri}"`);
-                    context.userEntries.push(extensionUri);
-                }
+                const extensionUri = userExtensionDirUri.resolve(file).withScheme('local-file').toString();
+                console.log(`found drop-in extension "${extensionUri}"`);
+                this.installerService.registerPluginToInstall(extensionUri);
             }
         }
     }

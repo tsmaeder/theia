@@ -17,12 +17,14 @@
 import { ConnectionHandler, JsonRpcConnectionHandler } from '@theia/core';
 import { CliContribution } from '@theia/core/lib/node';
 import { ContainerModule } from '@theia/core/shared/inversify';
-import { PluginDeployerParticipant, PluginDeployerResolver } from '@theia/plugin-ext/lib/common/plugin-protocol';
+import { PluginDeployerParticipant } from '@theia/plugin-ext/lib/common/plugin-protocol';
 import { VSXEnvironment, VSX_ENVIRONMENT_PATH } from '../common/vsx-environment';
 import { VsxCli } from './vsx-cli';
 import { VSXEnvironmentImpl } from './vsx-environment-impl';
-import { VSXExtensionResolver } from './vsx-extension-resolver';
 import { VsxCliDeployerParticipant } from './vsx-cli-deployer-participant';
+import { OpenVsxArtifactResolver } from './open-vsx-artifact-resolver';
+import { OpenVsxDependencyResolver } from './dependency-resolver';
+import { ArtifactResolverContribution, DependencyResolverContribution } from '@theia/plugin-management/lib/node/installer-service';
 
 export default new ContainerModule(bind => {
     bind(VSXEnvironment).to(VSXEnvironmentImpl).inSingletonScope();
@@ -31,8 +33,10 @@ export default new ContainerModule(bind => {
     bind(ConnectionHandler)
         .toDynamicValue(ctx => new JsonRpcConnectionHandler(VSX_ENVIRONMENT_PATH, () => ctx.container.get(VSXEnvironment)))
         .inSingletonScope();
-    bind(VSXExtensionResolver).toSelf().inSingletonScope();
-    bind(PluginDeployerResolver).toService(VSXExtensionResolver);
+    bind(OpenVsxArtifactResolver).toSelf().inSingletonScope();
+    bind(ArtifactResolverContribution).toService(OpenVsxArtifactResolver);
+    bind(OpenVsxDependencyResolver).toSelf().inSingletonScope();
+    bind(DependencyResolverContribution).toService(OpenVsxDependencyResolver);
     bind(VsxCliDeployerParticipant).toSelf().inSingletonScope();
     bind(PluginDeployerParticipant).toService(VsxCliDeployerParticipant);
 });

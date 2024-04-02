@@ -14,6 +14,7 @@
     "@theia/editor-preview": "1.59.0",
     "@theia/file-search": "1.59.0",
     "@theia/filesystem": "1.59.0",
+    "@theia/installer": "1.49.0",
     "@theia/markers": "1.59.0",
     "@theia/messages": "1.59.0",
     "@theia/monaco": "1.59.0",
@@ -22,6 +23,7 @@
     "@theia/notebook": "1.59.0",
     "@theia/output": "1.59.0",
     "@theia/plugin": "1.59.0",
+    "@theia/plugin-management": "1.49.0",
     "@theia/preferences": "1.59.0",
     "@theia/scm": "1.59.0",
     "@theia/search-in-workspace": "1.59.0",
@@ -97,6 +99,5 @@
   },
   "nyc": {
     "extends": "../../configs/nyc.json"
-  },
-  "gitHead": "21358137e41342742707f660b8e222f940a27652"
+  }
 }

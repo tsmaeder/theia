@@ -18,20 +18,24 @@ import { inject, injectable } from '@theia/core/shared/inversify';
 import { BackendApplicationContribution } from '@theia/core/lib/node/backend-application';
 import { HostedPluginReader as PluginReaderHosted } from '@theia/plugin-ext/lib/hosted/node/plugin-reader';
 import { Deferred } from '@theia/core/lib/common/promise-util';
-import { PluginMetadata } from '@theia/plugin-ext/lib/common/plugin-protocol';
-import { PluginDeployerEntryImpl } from '@theia/plugin-ext/lib/main/node/plugin-deployer-entry-impl';
-import { HostedPluginDeployerHandler } from '@theia/plugin-ext/lib/hosted/node/hosted-plugin-deployer-handler';
+import { PluginDeployer, PluginMetadata } from '@theia/plugin-ext/lib/common/plugin-protocol';
+import { DirectoryDeploymentLocation, InstallerService } from '@theia/plugin-management/lib/node';
+import { DeploymentKind } from '@theia/installer';
+import * as path from 'path';
 
 @injectable()
 export class HostedPluginReader implements BackendApplicationContribution {
 
     @inject(PluginReaderHosted)
-    protected pluginReader: PluginReaderHosted;
+    protected readonly pluginReader: PluginReaderHosted;
+
+    @inject(InstallerService)
+    protected readonly installerService: InstallerService;
 
     private readonly hostedPlugin = new Deferred<PluginMetadata | undefined>();
 
-    @inject(HostedPluginDeployerHandler)
-    protected deployerHandler: HostedPluginDeployerHandler;
+    @inject(PluginDeployer)
+    protected deployer: PluginDeployer;
 
     async initialize(): Promise<void> {
         this.pluginReader.getPluginMetadata(process.env.HOSTED_PLUGIN)
@@ -39,16 +43,9 @@ export class HostedPluginReader implements BackendApplicationContribution {
 
         const pluginPath = process.env.HOSTED_PLUGIN;
         if (pluginPath) {
-            const hostedPlugin = new PluginDeployerEntryImpl('Hosted Plugin', pluginPath!, pluginPath);
-            hostedPlugin.storeValue('isUnderDevelopment', true);
-            const hostedMetadata = await this.hostedPlugin.promise;
-            if (hostedMetadata!.model.entryPoint && (hostedMetadata!.model.entryPoint.backend || hostedMetadata!.model.entryPoint.headless)) {
-                this.deployerHandler.deployBackendPlugins([hostedPlugin]);
-            }
-
-            if (hostedMetadata!.model.entryPoint && hostedMetadata!.model.entryPoint.frontend) {
-                this.deployerHandler.deployFrontendPlugins([hostedPlugin]);
-            }
+            const location = new DirectoryDeploymentLocation(path.resolve(pluginPath, '..'));
+            const entry = await this.installerService.readPlugin(location, pluginPath, DeploymentKind.Installed);
+            this.deployer.deployPlugin(entry);
         }
     }
 

@@ -1,5 +1,5 @@
 // *****************************************************************************
-// Copyright (C) 2022 Ericsson and others.
+// Copyright (C) 2020 TypeFox and others.
 //
 // This program and the accompanying materials are made available under the
 // terms of the Eclipse Public License v. 2.0 which is available at
@@ -15,6 +15,7 @@
 // *****************************************************************************
 
 import URI from '@theia/core/lib/common/uri';
+import { PluginId } from '@theia/installer';
 
 /**
  * Static methods for identifying a plugin as the target of the VSCode deployment system.
@@ -23,22 +24,25 @@ import URI from '@theia/core/lib/common/uri';
 export namespace VSCodeExtensionUri {
     export const SCHEME = 'vscode-extension';
 
-    export function fromId(id: string, version?: string): URI {
-        if (typeof version === 'string') {
-            return new URI().withScheme(VSCodeExtensionUri.SCHEME).withAuthority(id).withPath(`/${version}`);
+    export function is(uri: URI): boolean {
+        return uri.scheme === SCHEME && !!uri.authority;
+    }
+
+    export function fromId(id: PluginId): URI {
+        if (id.version) {
+            return new URI().withScheme(VSCodeExtensionUri.SCHEME).withAuthority(id.id).withPath(`@${id.version}`);
         } else {
-            return new URI().withScheme(VSCodeExtensionUri.SCHEME).withAuthority(id);
+            return new URI().withScheme(VSCodeExtensionUri.SCHEME).withAuthority(id.id);
         }
     }
 
-    export function fromVersionedId(versionedId: string): URI {
-        const versionAndId = versionedId.split('@');
-        return fromId(versionAndId[0], versionAndId[1]);
-    }
-
-    export function toId(uri: URI): { id: string, version?: string } | undefined {
+    export function toId(uri: URI): PluginId | undefined {
         if (uri.scheme === VSCodeExtensionUri.SCHEME) {
-            return { id: uri.authority, version: uri.path.isRoot ? undefined : uri.path.base };
+            if (uri.path.isRoot) {
+                return PluginId.parse(`${uri.authority}`);
+            } else {
+                return PluginId.parse(`${uri.authority}@${uri.path.base}`);
+            }
         }
         return undefined;
     }

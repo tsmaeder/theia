@@ -16,11 +16,12 @@
 
 import * as path from 'path';
 import { promises as fs } from 'fs';
-import { PluginDeployerEntry, PluginDeployerDirectoryHandlerContext } from '../../common/plugin-protocol';
+import { PluginDeployerDirectoryHandlerContext } from '../../common/plugin-protocol';
+import { DeployedPlugin } from '@theia/installer';
 
 export class PluginDeployerDirectoryHandlerContextImpl implements PluginDeployerDirectoryHandlerContext {
 
-    constructor(private readonly pluginDeployerEntry: PluginDeployerEntry) { }
+    constructor(private readonly pluginDeployerEntry: DeployedPlugin) { }
 
     async copy(origin: string, target: string): Promise<void> {
         const entries = await fs.readdir(origin, { withFileTypes: true });
@@ -38,7 +39,7 @@ export class PluginDeployerDirectoryHandlerContextImpl implements PluginDeployer
         }));
     }
 
-    pluginEntry(): PluginDeployerEntry {
+    pluginEntry(): DeployedPlugin {
         return this.pluginDeployerEntry;
     }
 

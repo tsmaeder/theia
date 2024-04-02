@@ -14,12 +14,13 @@
 // SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-only WITH Classpath-exception-2.0
 // *****************************************************************************
 
-import { PluginDeployerEntry, PluginDeployerFileHandlerContext } from '../../common/plugin-protocol';
+import { DeployedPlugin } from '@theia/installer';
+import { PluginDeployerFileHandlerContext } from '../../common/plugin-protocol';
 import * as decompress from 'decompress';
 
 export class PluginDeployerFileHandlerContextImpl implements PluginDeployerFileHandlerContext {
 
-    constructor(private readonly pluginDeployerEntry: PluginDeployerEntry) {
+    constructor(private readonly pluginDeployerEntry: DeployedPlugin) {
 
     }
 
@@ -27,7 +28,7 @@ export class PluginDeployerFileHandlerContextImpl implements PluginDeployerFileH
         await decompress(sourcePath, destPath);
     }
 
-    pluginEntry(): PluginDeployerEntry {
+    pluginEntry(): DeployedPlugin {
         return this.pluginDeployerEntry;
     }
 }

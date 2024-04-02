@@ -25,9 +25,8 @@ import { PreferenceSchema, PreferenceSchemaProperties } from '@theia/core/lib/co
 import { ProblemMatcherContribution, ProblemPatternContribution, TaskDefinition } from '@theia/task/lib/common';
 import { ColorDefinition } from '@theia/core/lib/common/color';
 import { ResourceLabelFormatter } from '@theia/core/lib/common/label-protocol';
-import { PluginIdentifiers } from './plugin-identifiers';
+import { DeploymentKind, PluginId, VersionedIdString, DeployedPlugin as DeployerPlugin } from '@theia/installer';
 
-export { PluginIdentifiers };
 export const hostedServicePath = '/services/hostedPlugin';
 
 /**
@@ -377,70 +376,13 @@ export interface PluginScanner {
     getLifecycle(plugin: PluginPackage): PluginLifecycle;
 
     getContribution(plugin: PluginPackage): Promise<PluginContribution | undefined>;
-
-    /**
-     * A mapping between a dependency as its defined in package.json
-     * and its deployable form, e.g. `publisher.name` -> `vscode:extension/publisher.name`
-     */
-    getDependencies(plugin: PluginPackage): Map<string, string> | undefined;
-}
-
-/**
- * A plugin resolver is handling how to resolve a plugin link into a local resource.
- */
-export const PluginDeployerResolver = Symbol('PluginDeployerResolver');
-/**
- * A resolver handle a set of resource
- */
-export interface PluginDeployerResolver {
-
-    init?(pluginDeployerResolverInit: PluginDeployerResolverInit): void;
-
-    accept(pluginSourceId: string): boolean;
-
-    resolve(pluginResolverContext: PluginDeployerResolverContext, options?: PluginDeployOptions): Promise<void>;
-
-}
-
-export const PluginDeployerDirectoryHandler = Symbol('PluginDeployerDirectoryHandler');
-export interface PluginDeployerDirectoryHandler {
-    accept(pluginDeployerEntry: PluginDeployerEntry): Promise<boolean>;
-
-    handle(context: PluginDeployerDirectoryHandlerContext): Promise<void>;
-}
-
-export const PluginDeployerFileHandler = Symbol('PluginDeployerFileHandler');
-export interface PluginDeployerFileHandler {
-
-    accept(pluginDeployerEntry: PluginDeployerEntry): Promise<boolean>;
-
-    handle(context: PluginDeployerFileHandlerContext): Promise<void>;
-}
-
-export interface PluginDeployerResolverInit {
-
-}
-
-export interface PluginDeployerResolverContext {
-
-    addPlugin(pluginId: string, path: string): void;
-
-    getPlugins(): PluginDeployerEntry[];
-
-    getOriginId(): string;
-
-}
-
-export interface PluginDeployerStartContext {
-    readonly userEntries: string[]
-    readonly systemEntries: string[]
 }
 
 export const PluginDeployer = Symbol('PluginDeployer');
 export interface PluginDeployer {
-
+    configure(): Promise<void>;
     start(): Promise<void>;
-
+    deployPlugin(pluginDirectory: DeployerPlugin): Promise<void>;
 }
 
 export const PluginDeployerParticipant = Symbol('PluginDeployerParticipant');
@@ -448,100 +390,14 @@ export const PluginDeployerParticipant = Symbol('PluginDeployerParticipant');
  * A participant can hook into the plugin deployer lifecycle.
  */
 export interface PluginDeployerParticipant {
-    onWillStart?(context: PluginDeployerStartContext): Promise<void>;
-}
-
-export enum PluginDeployerEntryType {
-
-    FRONTEND,
-
-    BACKEND,
-
-    HEADLESS // Deployed in the Theia Node server outside the context of a frontend/backend connection
-}
-
-/**
- * Whether a plugin installed by a user or system.
- */
-export enum PluginType {
-    System,
-    User
-};
-
-export interface UnresolvedPluginEntry {
-    id: string;
-    type?: PluginType;
-}
-
-export interface PluginDeployerEntry {
-
-    /**
-     * ID (before any resolution)
-     */
-    id(): string;
-
-    /**
-     * Original resolved path
-     */
-    originalPath(): string;
-
-    /**
-     * Local path on the filesystem.
-     */
-    path(): string;
-
-    /**
-     * Get a specific entry
-     */
-    getValue<T>(key: string): T;
-
-    /**
-     * Store a value
-     */
-    storeValue<T>(key: string, value: T): void;
-
-    /**
-     * Update path
-     */
-    updatePath(newPath: string): void;
-
-    getChanges(): string[];
-
-    isFile(): Promise<boolean>;
-
-    isDirectory(): Promise<boolean>;
-
-    /**
-     * Resolved if a resolver has handle this plugin
-     */
-    isResolved(): boolean;
-
-    resolvedBy(): string;
-
-    /**
-     * Accepted when a handler is telling this location can go live
-     */
-    isAccepted(...types: PluginDeployerEntryType[]): boolean;
-
-    accept(...types: PluginDeployerEntryType[]): void;
-
-    hasError(): boolean;
-
-    type: PluginType
-    /**
-     * A fs path to a directory where a plugin is located.
-     * Depending on a plugin format it can be different from `path`.
-     * Use `path` if you want to resolve something within a plugin, like `README.md` file.
-     * Use `rootPath` if you want to manipulate the entire plugin location, like delete or move it.
-     */
-    rootPath: string
+    onWillStart?(): Promise<void>;
 }
 
 export interface PluginDeployerFileHandlerContext {
 
     unzip(sourcePath: string, destPath: string): Promise<void>;
 
-    pluginEntry(): PluginDeployerEntry;
+    pluginEntry(): DeployerPlugin;
 
 }
 
@@ -549,7 +405,7 @@ export interface PluginDeployerDirectoryHandlerContext {
 
     copy(origin: string, target: string): Promise<void>;
 
-    pluginEntry(): PluginDeployerEntry;
+    pluginEntry(): DeployerPlugin;
 
 }
 
@@ -946,7 +802,6 @@ export interface PluginMetadata {
     model: PluginModel;
     lifecycle: PluginLifecycle;
     isUnderDevelopment?: boolean;
-    outOfSync: boolean;
 }
 
 export const MetadataProcessor = Symbol('MetadataProcessor');
@@ -971,48 +826,22 @@ export interface HostedPluginClient {
     onDidDeploy(): void;
 }
 
-export interface PluginDependencies {
-    metadata: PluginMetadata
-    /**
-     * Actual listing of plugin dependencies.
-     * Mapping from {@link PluginIdentifiers.UnversionedId external representation} of plugin identity to a string
-     * that can be used to identify the resolver for the specific plugin case, e.g. with scheme `vscode://<id>`.
-     */
-    mapping?: Map<string, string>
-}
-
 export const PluginDeployerHandler = Symbol('PluginDeployerHandler');
 export interface PluginDeployerHandler {
-    deployFrontendPlugins(frontendPlugins: PluginDeployerEntry[]): Promise<number | undefined>;
-    deployBackendPlugins(backendPlugins: PluginDeployerEntry[]): Promise<number | undefined>;
-
-    getDeployedPlugins(): Promise<DeployedPlugin[]>;
-    getDeployedPluginsById(pluginId: string): DeployedPlugin[];
-
-    getDeployedPlugin(pluginId: PluginIdentifiers.VersionedId): DeployedPlugin | undefined;
-    /**
-     * Removes the plugin from the location it originally resided on disk.
-     * Unless `--uncompressed-plugins-in-place` is passed to the CLI, this operation is safe.
-     */
-    uninstallPlugin(pluginId: PluginIdentifiers.VersionedId): Promise<boolean>;
-    /**
-     * Removes the plugin from the locations to which it had been deployed.
-     * This operation is not safe - references to deleted assets may remain.
-     */
-    undeployPlugin(pluginId: PluginIdentifiers.VersionedId): Promise<boolean>;
-
-    getPluginDependencies(pluginToBeInstalled: PluginDeployerEntry): Promise<PluginDependencies | undefined>;
+    deployFrontendPlugins(frontendPlugins: DeployerPlugin[]): Promise<number | undefined>;
+    deployBackendPlugins(backendPlugins: DeployerPlugin[]): Promise<number | undefined>;
+    getDeployedPlugin(pluginId: PluginId.VersionedId): DeployedPlugin | undefined;
 }
 
 export interface GetDeployedPluginsParams {
-    pluginIds: PluginIdentifiers.VersionedId[]
+    pluginIds: PluginId.VersionedId[]
 }
 
 export interface DeployedPlugin {
     /**
      * defaults to system
      */
-    type?: PluginType;
+    kind: DeploymentKind;
     metadata: PluginMetadata;
     contributes?: PluginContribution;
 }
@@ -1020,9 +849,7 @@ export interface DeployedPlugin {
 export const HostedPluginServer = Symbol('HostedPluginServer');
 export interface HostedPluginServer extends RpcServer<HostedPluginClient> {
 
-    getDeployedPluginIds(): Promise<PluginIdentifiers.VersionedId[]>;
-
-    getUninstalledPluginIds(): Promise<readonly PluginIdentifiers.VersionedId[]>;
+    getDeployedPluginIds(): Promise<VersionedIdString[]>;
 
     getDeployedPlugins(params: GetDeployedPluginsParams): Promise<DeployedPlugin[]>;
 
@@ -1041,28 +868,12 @@ export interface WorkspaceStorageKind {
 export type GlobalStorageKind = undefined;
 export type PluginStorageKind = GlobalStorageKind | WorkspaceStorageKind;
 
-export interface PluginDeployOptions {
-    version: string;
-    /** Instructs the deployer to ignore any existing plugins with different versions */
-    ignoreOtherVersions?: boolean;
-}
-
 /**
  * The JSON-RPC workspace interface.
  */
 export const pluginServerJsonRpcPath = '/services/plugin-ext';
 export const PluginServer = Symbol('PluginServer');
 export interface PluginServer {
-
-    /**
-     * Deploy a plugin.
-     *
-     * @param type whether a plugin is installed by a system or a user, defaults to a user
-     */
-    deploy(pluginEntry: string, type?: PluginType, options?: PluginDeployOptions): Promise<void>;
-    uninstall(pluginId: PluginIdentifiers.VersionedId): Promise<void>;
-    undeploy(pluginId: PluginIdentifiers.VersionedId): Promise<void>;
-
     setStorageValue(key: string, value: KeysToAnyValues, kind: PluginStorageKind): Promise<boolean>;
     getStorageValue(key: string, kind: PluginStorageKind): Promise<KeysToAnyValues>;
     getAllStorageValues(kind: PluginStorageKind): Promise<KeysToKeysToAnyValue>;
@@ -1086,7 +897,7 @@ export interface ServerPluginRunner {
     /**
      * Provides additional plugin ids.
      */
-    getExtraDeployedPluginIds(): Promise<PluginIdentifiers.VersionedId[]>;
+    getExtraDeployedPluginIds(): Promise<PluginId.VersionedId[]>;
 
 }
 

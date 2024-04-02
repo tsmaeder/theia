@@ -15,6 +15,9 @@
   ],
   "references": [
     {
+      "path": "../../dev-packages/installer"
+    },
+    {
       "path": "../bulk-edit"
     },
     {
@@ -61,6 +64,9 @@
     },
     {
       "path": "../plugin"
+    },
+    {
+      "path": "../plugin-management"
     },
     {
       "path": "../preferences"

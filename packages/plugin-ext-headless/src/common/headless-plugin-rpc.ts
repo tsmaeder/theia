@@ -43,4 +43,4 @@ export interface HeadlessPluginManagerInitializeParams {
     extApi?: ExtPluginApi[];
 }
 
-export interface HeadlessPluginManagerExt extends AbstractPluginManagerExt<HeadlessPluginManagerInitializeParams> { }
+export type HeadlessPluginManagerExt = AbstractPluginManagerExt<HeadlessPluginManagerInitializeParams>;

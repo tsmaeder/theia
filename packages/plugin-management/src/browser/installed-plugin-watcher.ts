@@ -1,5 +1,5 @@
 // *****************************************************************************
-// Copyright (C) 2020 TypeFox and others.
+// Copyright (C) 2024 STMicroelectronics and others.
 //
 // This program and the accompanying materials are made available under the
 // terms of the Eclipse Public License v. 2.0 which is available at
@@ -14,19 +14,20 @@
 // SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-only WITH Classpath-exception-2.0
 // *****************************************************************************
 
-import { injectable, inject } from '@theia/core/shared/inversify';
-import { PluginTheiaEnvironment } from '../common/plugin-theia-environment';
-import { PluginDeployerParticipant, PluginDeployerStartContext } from '../../common/plugin-protocol';
+import { Emitter, Event } from '@theia/core';
+import { InstallerClient } from '../common/installer-backend-service';
+import { injectable } from '@theia/core/shared/inversify';
 
 @injectable()
-export class PluginTheiaDeployerParticipant implements PluginDeployerParticipant {
+export class InstalledPluginWatcher {
+    protected readonly onDidChangeInstalledPluginsEmitter = new Emitter<void>();
+    readonly onDidChangeInstalledPlugins: Event<void> = this.onDidChangeInstalledPluginsEmitter.event;
 
-    @inject(PluginTheiaEnvironment)
-    protected readonly environments: PluginTheiaEnvironment;
-
-    async onWillStart(context: PluginDeployerStartContext): Promise<void> {
-        const pluginsDirUri = await this.environments.getPluginsDirUri();
-        context.userEntries.push(pluginsDirUri.withScheme('local-dir').toString());
+    getInstallerClient(): InstallerClient {
+        return {
+            installedPluginsChanged: () => {
+                this.onDidChangeInstalledPluginsEmitter.fire();
+            }
+        };
     }
-
 }

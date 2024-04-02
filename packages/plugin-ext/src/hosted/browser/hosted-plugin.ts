@@ -72,6 +72,7 @@ import {
     ALL_ACTIVATION_EVENT, isConnectionScopedBackendPlugin
 } from '../common/hosted-plugin';
 import { isRemote } from '@theia/core/lib/browser/browser';
+import { PluginId } from '@theia/installer';
 
 export type DebugActivationEvent = 'onDebugResolve' | 'onDebugInitialConfigurations' | 'onDebugAdapterProtocolTracker' | 'onDebugDynamicConfigurations';
 
@@ -180,7 +181,7 @@ export class HostedPluginSupport extends AbstractHostedPluginSupport<PluginManag
     protected readonly applicationServer: ApplicationServer;
 
     constructor() {
-        super(generateUuid());
+        super('browser' + generateUuid());
     }
 
     @postConstruct()
@@ -231,6 +232,17 @@ export class HostedPluginSupport extends AbstractHostedPluginSupport<PluginManag
                 };
             }
         });
+    }
+
+    async getLoadedPlugins(): Promise<PluginId.VersionedId[]> {
+        const result: PluginId.VersionedId[] = [];
+        for (const manager of this.managers.values()) {
+            const loadedPlugins = await manager.$getDeployedPlugins();
+            for (const versionedId of loadedPlugins) {
+                result.push(versionedId as PluginId.VersionedId);
+            }
+        };
+        return result;
     }
 
     protected createTheiaReadyPromise(): Promise<unknown> {

@@ -40,7 +40,7 @@ export class HostedPluginWatcher {
                 logEmitter.fire(logPart);
                 return Promise.resolve();
             },
-            onDidDeploy: () => this.onDidDeployEmitter.fire(undefined)
+            onDidDeploy: () => this.onDidDeployEmitter.fire()
         };
     }
 

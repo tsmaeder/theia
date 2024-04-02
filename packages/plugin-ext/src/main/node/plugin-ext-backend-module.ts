@@ -21,24 +21,16 @@ import { WsRequestValidatorContribution } from '@theia/core/lib/node/ws-request-
 import { PluginsKeyValueStorage } from './plugins-key-value-storage';
 import { PluginDeployerContribution } from './plugin-deployer-contribution';
 import {
-    PluginDeployer, PluginDeployerResolver, PluginDeployerFileHandler,
-    PluginDeployerDirectoryHandler, PluginServer, pluginServerJsonRpcPath, PluginDeployerParticipant
+    PluginDeployer, PluginServer, pluginServerJsonRpcPath, PluginDeployerParticipant
 } from '../../common/plugin-protocol';
 import { PluginDeployerImpl } from './plugin-deployer-impl';
-import { LocalDirectoryPluginDeployerResolver } from './resolvers/local-directory-plugin-deployer-resolver';
-import { PluginTheiaFileHandler } from './handlers/plugin-theia-file-handler';
-import { PluginTheiaDirectoryHandler } from './handlers/plugin-theia-directory-handler';
-import { GithubPluginDeployerResolver } from './plugin-github-resolver';
-import { HttpPluginDeployerResolver } from './plugin-http-resolver';
 import { ConnectionHandler, RpcConnectionHandler, bindContributionProvider } from '@theia/core';
 import { PluginPathsService, pluginPathsServicePath } from '../common/plugin-paths-protocol';
 import { PluginPathsServiceImpl } from './paths/plugin-paths-service';
 import { PluginServerHandler } from './plugin-server-handler';
 import { PluginCliContribution } from './plugin-cli-contribution';
 import { PluginTheiaEnvironment } from '../common/plugin-theia-environment';
-import { PluginTheiaDeployerParticipant } from './plugin-theia-deployer-participant';
 import { WebviewBackendSecurityWarnings } from './webview-backend-security-warnings';
-import { PluginUninstallationManager } from './plugin-uninstallation-manager';
 import { LocalizationServerImpl } from '@theia/core/lib/node/i18n/localization-server';
 import { PluginLocalizationServer } from './plugin-localization-server';
 import { PluginMgmtCliContribution } from './plugin-mgmt-cli-contribution';
@@ -46,6 +38,17 @@ import { PluginRemoteCliContribution } from './plugin-remote-cli-contribution';
 import { RemoteCliContribution } from '@theia/core/lib/node/remote/remote-cli-contribution';
 import { PluginRemoteCopyContribution } from './plugin-remote-copy-contribution';
 import { RemoteCopyContribution } from '@theia/core/lib/node/remote/remote-copy-contribution';
+import {
+    DirectoryDeployedPluginHandler, PluginDirectoryLayoutHandler, PluginEngineHandler, PluginSourceDirectoryLayoutHandler, TarballDirectoryLayoutHandler,
+    TheiaPluginEngineHandler
+} from './plugin-directory-layout';
+import { GithubArtifactResolver } from './plugin-github-resolver';
+import { HttpArtifactResolver } from './plugin-http-resolver';
+import {
+    ArtifactResolverContribution, DeployedPluginHandlerContribution,
+    PluginDeployerContribution as InstallerDeployerContribution
+} from '@theia/plugin-management/lib/node/installer-service';
+import { TheiaFileDeployer } from './theia-file-deployer';
 
 export function bindMainBackend(bind: interfaces.Bind, unbind: interfaces.Unbind, isBound: interfaces.IsBound, rebind: interfaces.Rebind): void {
     bind(PluginApiContribution).toSelf().inSingletonScope();
@@ -56,19 +59,29 @@ export function bindMainBackend(bind: interfaces.Bind, unbind: interfaces.Unbind
     bind(PluginDeployer).to(PluginDeployerImpl).inSingletonScope();
     bind(PluginDeployerContribution).toSelf().inSingletonScope();
     bind(BackendApplicationContribution).toService(PluginDeployerContribution);
+    bindContributionProvider(bind, DeployedPluginHandlerContribution);
 
-    bind(PluginUninstallationManager).toSelf().inSingletonScope();
+    bind(DirectoryDeployedPluginHandler).toSelf().inSingletonScope();
+    bind(DeployedPluginHandlerContribution).toService(DirectoryDeployedPluginHandler);
 
-    bind(PluginDeployerResolver).to(LocalDirectoryPluginDeployerResolver).inSingletonScope();
-    bind(PluginDeployerResolver).to(GithubPluginDeployerResolver).inSingletonScope();
-    bind(PluginDeployerResolver).to(HttpPluginDeployerResolver).inSingletonScope();
+    bindContributionProvider(bind, PluginDirectoryLayoutHandler);
+    bind(PluginSourceDirectoryLayoutHandler).toSelf().inSingletonScope();
+    bind(PluginDirectoryLayoutHandler).toService(PluginSourceDirectoryLayoutHandler);
+    bind(TarballDirectoryLayoutHandler).toSelf().inSingletonScope();
+    bind(PluginDirectoryLayoutHandler).toService(TarballDirectoryLayoutHandler);
+
+    bindContributionProvider(bind, PluginEngineHandler);
+    bind(TheiaPluginEngineHandler).toSelf().inSingletonScope();
+    bind(PluginEngineHandler).toService(TheiaPluginEngineHandler);
+
+    bind(GithubArtifactResolver).toSelf().inSingletonScope();
+    bind(ArtifactResolverContribution).toService(GithubArtifactResolver);
+    bind(HttpArtifactResolver).toSelf().inSingletonScope();
+    bind(ArtifactResolverContribution).toService(HttpArtifactResolver);
+    bind(TheiaFileDeployer).toSelf().inSingletonScope();
+    bind(InstallerDeployerContribution).toService(TheiaFileDeployer);
 
     bind(PluginTheiaEnvironment).toSelf().inSingletonScope();
-    bind(PluginTheiaDeployerParticipant).toSelf().inSingletonScope();
-    bind(PluginDeployerParticipant).toService(PluginTheiaDeployerParticipant);
-
-    bind(PluginDeployerFileHandler).to(PluginTheiaFileHandler).inSingletonScope();
-    bind(PluginDeployerDirectoryHandler).to(PluginTheiaDirectoryHandler).inSingletonScope();
 
     bind(PluginServer).to(PluginServerHandler).inSingletonScope();
 

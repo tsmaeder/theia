@@ -58,7 +58,7 @@ export class TheiaHeadlessPluginScanner extends AbstractPluginScanner {
      */
     adaptForHeadless(plugin: DeployedPlugin): DeployedPlugin {
         return {
-            type: plugin.type,
+            kind: plugin.kind,
             metadata: this.adaptMetadataForHeadless(plugin),
             contributes: this.adaptContributesForHeadless(plugin)
         };

@@ -20,3 +20,4 @@ export * from '../common/file-uri';
 export * from './messaging';
 export * from './cli';
 export { FileSystemLocking } from './filesystem-locking';
+export { SettingService } from './setting-service';

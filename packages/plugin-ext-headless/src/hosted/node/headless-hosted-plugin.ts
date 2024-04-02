@@ -66,7 +66,7 @@ export class HeadlessHostedPluginSupport extends AbstractHostedPluginSupport<Hea
     protected readonly supportedActivationEventsContributions: ContributionProvider<string[]>;
 
     constructor() {
-        super(generateUuid());
+        super('headless' + generateUuid());
     }
 
     shutDown(): void {

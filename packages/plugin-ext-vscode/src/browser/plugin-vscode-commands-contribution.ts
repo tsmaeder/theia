@@ -52,7 +52,6 @@ import { DiffService } from '@theia/workspace/lib/browser/diff-service';
 import { inject, injectable, optional } from '@theia/core/shared/inversify';
 import { Position } from '@theia/plugin-ext/lib/common/plugin-api-rpc';
 import { URI } from '@theia/core/shared/vscode-uri';
-import { PluginServer } from '@theia/plugin-ext/lib/common/plugin-protocol';
 import { TerminalFrontendContribution } from '@theia/terminal/lib/browser/terminal-frontend-contribution';
 import { QuickOpenWorkspace } from '@theia/workspace/lib/browser/quick-open-workspace';
 import { TerminalService } from '@theia/terminal/lib/browser/base/terminal-service';
@@ -77,11 +76,13 @@ import { CustomEditorOpener } from '@theia/plugin-ext/lib/main/browser/custom-ed
 import { nls } from '@theia/core/lib/common/nls';
 import { WindowService } from '@theia/core/lib/browser/window/window-service';
 import * as monaco from '@theia/monaco-editor-core';
-import { VSCodeExtensionUri } from '../common/plugin-vscode-uri';
 import { CodeEditorWidgetUtil } from '@theia/plugin-ext/lib/main/browser/menus/vscode-theia-menu-mappings';
 import { OutlineViewContribution } from '@theia/outline-view/lib/browser/outline-view-contribution';
 import { CompletionList, Range, Position as PluginPosition } from '@theia/plugin';
 import { MonacoLanguages } from '@theia/monaco/lib/browser/monaco-languages';
+import { VSCodeExtensionUri } from '../common/vsx-extension-uri';
+import { PluginId } from '@theia/installer';
+import { InstallerBackendService } from '@theia/plugin-management/lib/common/installer-backend-service';
 
 export namespace VscodeCommands {
 
@@ -175,8 +176,8 @@ export class PluginVscodeCommandsContribution implements CommandContribution {
     protected readonly terminalService: TerminalService;
     @inject(CodeEditorWidgetUtil)
     protected readonly codeEditorWidgetUtil: CodeEditorWidgetUtil;
-    @inject(PluginServer)
-    protected readonly pluginServer: PluginServer;
+    @inject(InstallerBackendService)
+    protected readonly installerService: InstallerBackendService;
     @inject(FileService)
     protected readonly fileService: FileService;
     @inject(CallHierarchyServiceProvider)
@@ -373,10 +374,10 @@ export class PluginVscodeCommandsContribution implements CommandContribution {
         commands.registerCommand({ id: VscodeCommands.INSTALL_FROM_VSIX.id }, {
             execute: async (vsixUriOrExtensionId: TheiaURI | UriComponents | string) => {
                 if (typeof vsixUriOrExtensionId === 'string') {
-                    await this.pluginServer.deploy(VSCodeExtensionUri.fromId(vsixUriOrExtensionId).toString());
+                    await this.installerService.install([VSCodeExtensionUri.fromId(PluginId.parse(vsixUriOrExtensionId)).toString()], true);
                 } else {
                     const uriPath = isUriComponents(vsixUriOrExtensionId) ? URI.revive(vsixUriOrExtensionId).fsPath : await this.fileService.fsPath(vsixUriOrExtensionId);
-                    await this.pluginServer.deploy(`local-file:${uriPath}`);
+                    await this.installerService.install([`local-file:${uriPath}`], true);
                 }
             }
         });

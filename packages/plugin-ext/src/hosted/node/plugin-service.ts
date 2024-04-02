@@ -14,14 +14,15 @@
 // SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-only WITH Classpath-exception-2.0
 // *****************************************************************************
 import { injectable, inject, named, optional, postConstruct } from '@theia/core/shared/inversify';
-import { HostedPluginServer, HostedPluginClient, PluginDeployer, GetDeployedPluginsParams, DeployedPlugin, PluginIdentifiers } from '../../common/plugin-protocol';
+import { HostedPluginServer, HostedPluginClient, PluginDeployer, GetDeployedPluginsParams, DeployedPlugin } from '../../common/plugin-protocol';
 import { HostedPluginSupport } from './hosted-plugin';
 import { ILogger, Disposable, ContributionProvider, DisposableCollection } from '@theia/core';
 import { ExtPluginApiProvider, ExtPluginApi } from '../../common/plugin-ext-api-contribution';
 import { HostedPluginDeployerHandler } from './hosted-plugin-deployer-handler';
 import { PluginDeployerImpl } from '../../main/node/plugin-deployer-impl';
 import { HostedPluginLocalizationService } from './hosted-plugin-localization-service';
-import { PluginUninstallationManager } from '../../main/node/plugin-uninstallation-manager';
+import { PluginId, VersionedIdString, VersionedPluginId } from '@theia/installer';
+import { InstallerService } from '@theia/plugin-management/lib/node';
 
 export const BackendPluginHostableFilter = Symbol('BackendPluginHostableFilter');
 /**
@@ -45,11 +46,12 @@ export class HostedPluginServerImpl implements HostedPluginServer {
     @inject(HostedPluginLocalizationService)
     protected readonly localizationService: HostedPluginLocalizationService;
 
+    @inject(InstallerService)
+    protected readonly installerService: InstallerService;
+
     @inject(ContributionProvider)
     @named(Symbol.for(ExtPluginApiProvider))
     protected readonly extPluginAPIContributions: ContributionProvider<ExtPluginApiProvider>;
-
-    @inject(PluginUninstallationManager) protected readonly uninstallationManager: PluginUninstallationManager;
 
     @inject(BackendPluginHostableFilter)
     @optional()
@@ -58,17 +60,16 @@ export class HostedPluginServerImpl implements HostedPluginServer {
     protected client: HostedPluginClient | undefined;
     protected toDispose = new DisposableCollection();
 
-    protected _ignoredPlugins?: Set<PluginIdentifiers.VersionedId>;
-
+    protected _ignoredPlugins?: Set<PluginId.VersionedId>;
     // We ignore any plugins that are marked as uninstalled the first time the frontend requests information about deployed plugins.
-    protected get ignoredPlugins(): Set<PluginIdentifiers.VersionedId> {
+    protected get ignoredPlugins(): Set<PluginId.VersionedId> {
         if (!this._ignoredPlugins) {
-            this._ignoredPlugins = new Set(this.uninstallationManager.getUninstalledPluginIds());
+            this._ignoredPlugins = new Set();
         }
         return this._ignoredPlugins;
     }
 
-    protected readonly pluginVersions = new Map<PluginIdentifiers.UnversionedId, string>();
+    protected readonly pluginVersions = new Map<string, string>();
 
     constructor(
         @inject(HostedPluginSupport) private readonly hostedPlugin: HostedPluginSupport) {
@@ -82,9 +83,9 @@ export class HostedPluginServerImpl implements HostedPluginServer {
 
         this.toDispose.pushAll([
             this.pluginDeployer.onDidDeploy(() => this.client?.onDidDeploy()),
-            this.uninstallationManager.onDidChangeUninstalledPlugins(currentUninstalled => {
+            this.installerService.onDidChangeUninstalledPlugins(() => {
                 if (this._ignoredPlugins) {
-                    const uninstalled = new Set(currentUninstalled);
+                    const uninstalled = new Set(this.installerService.getUninstalledPlugins());
                     for (const previouslyUninstalled of this._ignoredPlugins) {
                         if (!uninstalled.has(previouslyUninstalled)) {
                             this._ignoredPlugins.delete(previouslyUninstalled);
@@ -110,16 +111,16 @@ export class HostedPluginServerImpl implements HostedPluginServer {
         this.hostedPlugin.setClient(client);
     }
 
-    async getDeployedPluginIds(): Promise<PluginIdentifiers.VersionedId[]> {
+    async getDeployedPluginIds(): Promise<VersionedIdString[]> {
         const backendPlugins = (await this.deployerHandler.getDeployedBackendPlugins())
             .filter(this.backendPluginHostableFilter);
         if (backendPlugins.length > 0) {
             this.hostedPlugin.runPluginServer(this.getServerName());
         }
-        const plugins = new Set<PluginIdentifiers.VersionedId>();
-        const addIds = async (identifiers: PluginIdentifiers.VersionedId[]): Promise<void> => {
+        const plugins = new Set<VersionedIdString>();
+        const addIds = async (identifiers: VersionedIdString[]): Promise<void> => {
             for (const pluginId of identifiers) {
-                if (this.isRelevantPlugin(pluginId)) {
+                if (this.isRelevantPlugin(PluginId.parse(pluginId) as VersionedPluginId)) {
                     plugins.add(pluginId);
                 }
             }
@@ -137,26 +138,18 @@ export class HostedPluginServerImpl implements HostedPluginServer {
      * The deployment system may have multiple versions of the same plugin available, but
      * a single session should only ever activate one of them.
      */
-    protected isRelevantPlugin(identifier: PluginIdentifiers.VersionedId): boolean {
-        const versionAndId = PluginIdentifiers.idAndVersionFromVersionedId(identifier);
-        if (!versionAndId) {
+    protected isRelevantPlugin(identifier: VersionedPluginId): boolean {
+        const knownVersion = this.pluginVersions.get(identifier.id);
+        if (knownVersion !== undefined && knownVersion !== identifier.version) {
             return false;
         }
-        const knownVersion = this.pluginVersions.get(versionAndId.id);
-        if (knownVersion !== undefined && knownVersion !== versionAndId.version) {
-            return false;
-        }
-        if (this.ignoredPlugins.has(identifier)) {
+        if (this.ignoredPlugins.has(PluginId.toVersionedString(identifier))) {
             return false;
         }
         if (knownVersion === undefined) {
-            this.pluginVersions.set(versionAndId.id, versionAndId.version);
+            this.pluginVersions.set(identifier.id, identifier.version);
         }
         return true;
-    }
-
-    getUninstalledPluginIds(): Promise<readonly PluginIdentifiers.VersionedId[]> {
-        return Promise.resolve(this.uninstallationManager.getUninstalledPluginIds());
     }
 
     async getDeployedPlugins({ pluginIds }: GetDeployedPluginsParams): Promise<DeployedPlugin[]> {
@@ -166,7 +159,7 @@ export class HostedPluginServerImpl implements HostedPluginServer {
         const plugins: DeployedPlugin[] = [];
         let extraDeployedPlugins: Map<string, DeployedPlugin> | undefined;
         for (const versionedId of pluginIds) {
-            if (!this.isRelevantPlugin(versionedId)) {
+            if (!this.isRelevantPlugin(PluginId.parse(versionedId) as VersionedPluginId)) {
                 continue;
             }
             let plugin = this.deployerHandler.getDeployedPlugin(versionedId);
@@ -174,7 +167,7 @@ export class HostedPluginServerImpl implements HostedPluginServer {
                 if (!extraDeployedPlugins) {
                     extraDeployedPlugins = new Map<string, DeployedPlugin>();
                     for (const extraDeployedPlugin of await this.hostedPlugin.getExtraDeployedPlugins()) {
-                        extraDeployedPlugins.set(PluginIdentifiers.componentsToVersionedId(extraDeployedPlugin.metadata.model), extraDeployedPlugin);
+                        extraDeployedPlugins.set(PluginId.toString(PluginId.fromComponents(extraDeployedPlugin.metadata.model)), extraDeployedPlugin);
                     }
                 }
                 plugin = extraDeployedPlugins.get(versionedId);

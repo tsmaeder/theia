@@ -60,7 +60,6 @@ import {
     Localization,
     PluginPackageTranslation,
     Translation,
-    PluginIdentifiers,
     TerminalProfile,
     PluginIconContribution,
     PluginEntryPoint,
@@ -80,6 +79,7 @@ import { TaskDefinition } from '@theia/task/lib/common/task-protocol';
 import { ColorDefinition } from '@theia/core/lib/common/color';
 import { CSSIcon } from '@theia/core/lib/common/markdown-rendering/icon-utilities';
 import { PluginUriFactory } from './plugin-uri-factory';
+import { PluginId } from '@theia/installer';
 
 const colorIdPattern = '^\\w+[.\\w+]*$';
 const iconIdPattern = `^${CSSIcon.iconNameSegment}(-${CSSIcon.iconNameSegment})+$`;
@@ -110,7 +110,7 @@ export abstract class AbstractPluginScanner implements PluginScanner {
     }
 
     getModel(plugin: PluginPackage): PluginModel {
-        const publisher = plugin.publisher ?? PluginIdentifiers.UNPUBLISHED;
+        const publisher = plugin.publisher ?? PluginId.UNPUBLISHED;
         const result: PluginModel = {
             packagePath: plugin.packagePath,
             packageUri: this.pluginUriFactory.createUri(plugin).toString(),
@@ -145,11 +145,6 @@ export abstract class AbstractPluginScanner implements PluginScanner {
         }
 
         return result;
-    }
-
-    getDependencies(rawPlugin: PluginPackage): Map<string, string> | undefined {
-        // skip it since there is no way to load transitive dependencies for Theia plugins yet
-        return undefined;
     }
 
     async getContribution(rawPlugin: PluginPackage): Promise<PluginContribution | undefined> {

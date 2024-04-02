@@ -16,10 +16,10 @@
 
 import * as path from 'path';
 import { injectable } from '@theia/core/shared/inversify';
-import { PluginScanner, PluginEngine, PluginPackage, PluginModel, PluginLifecycle, PluginEntryPoint, buildFrontendModuleName, UIKind, PluginIdentifiers } from '@theia/plugin-ext';
+import { PluginScanner, PluginEngine, PluginPackage, PluginModel, PluginLifecycle, PluginEntryPoint, buildFrontendModuleName, UIKind } from '@theia/plugin-ext';
 import { TheiaPluginScanner } from '@theia/plugin-ext/lib/hosted/node/scanners/scanner-theia';
 import { environment } from '@theia/core/shared/@theia/application-package/lib/environment';
-import { VSCodeExtensionUri } from '../common/plugin-vscode-uri';
+import { PluginId } from '@theia/installer';
 
 const uiKind = environment.electron.is() ? UIKind.Desktop : UIKind.Web;
 
@@ -34,7 +34,7 @@ export class VsCodePluginScanner extends TheiaPluginScanner implements PluginSca
 
     override getModel(plugin: PluginPackage): PluginModel {
         // publisher can be empty on vscode extension development
-        const publisher = plugin.publisher ?? PluginIdentifiers.UNPUBLISHED;
+        const publisher = plugin.publisher ?? PluginId.UNPUBLISHED;
 
         // Only one entrypoint is valid in vscode extensions
         // Mimic choosing frontend (web extension) and backend (local/remote extension) as described here:
@@ -77,26 +77,6 @@ export class VsCodePluginScanner extends TheiaPluginScanner implements PluginSca
             licenseUrl: PluginPackage.toPluginUrl(plugin, './LICENSE')
         };
         return result;
-    }
-
-    /**
-     * Maps extension dependencies to deployable extension dependencies.
-     */
-    override getDependencies(plugin: PluginPackage): Map<string, string> | undefined {
-        // Store the list of dependencies.
-        const dependencies = new Map<string, string>();
-        // Iterate through the list of dependencies from `extensionDependencies` and `extensionPack`.
-        for (const dependency of [plugin.extensionDependencies, plugin.extensionPack]) {
-            if (dependency !== undefined) {
-                // Iterate over the list of dependencies present, and add them to the collection.
-                dependency.forEach((dep: string) => {
-                    const dependencyId = dep.toLowerCase();
-                    dependencies.set(dependencyId, VSCodeExtensionUri.fromId(dependencyId).toString());
-                });
-            }
-        }
-        // Return the map of dependencies if present, else `undefined`.
-        return dependencies.size > 0 ? dependencies : undefined;
     }
 
     override getLifecycle(plugin: PluginPackage): PluginLifecycle {

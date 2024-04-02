@@ -280,6 +280,8 @@ export interface AbstractPluginManagerExt<P extends Record<string, any>> {
     $activateByEvent(event: string): Promise<void>;
 
     $activatePlugin(id: string): Promise<void>;
+
+    $getDeployedPlugins(): Promise<string[]>;
 }
 
 export interface PluginManagerExt extends AbstractPluginManagerExt<PluginManagerInitializeParams> { }

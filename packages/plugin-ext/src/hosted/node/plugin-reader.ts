@@ -127,10 +127,4 @@ export class HostedPluginReader implements BackendApplicationContribution {
         const scanner = this.scanner.getScanner(plugin);
         return scanner.getContribution(plugin);
     }
-
-    readDependencies(plugin: PluginPackage): Map<string, string> | undefined {
-        const scanner = this.scanner.getScanner(plugin);
-        return scanner.getDependencies(plugin);
-    }
-
 }

@@ -168,7 +168,7 @@ export class PluginContributionHandler {
         }
         const toDispose = new DisposableCollection(Disposable.create(() => { /* mark as not disposed */ }));
         /* eslint-disable @typescript-eslint/no-explicit-any */
-        const logError = (message: string, ...args: any[]) => console.error(`[${clientId}][${plugin.metadata.model.id}]: ${message}`, ...args);
+        // const logError = (message: string, ...args: any[]) => console.error(`[${clientId}][${plugin.metadata.model.id}]: ${message}`, ...args);
         const logWarning = (message: string, ...args: any[]) => console.warn(`[${clientId}][${plugin.metadata.model.id}]: ${message}`, ...args);
         const pushContribution = (id: string, contribute: () => Disposable) => {
             if (toDispose.disposed) {
@@ -177,7 +177,7 @@ export class PluginContributionHandler {
             try {
                 toDispose.push(contribute());
             } catch (e) {
-                logError(`Failed to load '${id}' contribution.`, e);
+                // logError(`Failed to load '${id}' contribution.`, e);
             }
         };
 

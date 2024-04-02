@@ -15,6 +15,9 @@
   ],
   "references": [
     {
+      "path": "../../dev-packages/installer"
+    },
+    {
       "path": "../callhierarchy"
     },
     {
@@ -40,6 +43,9 @@
     },
     {
       "path": "../plugin-ext"
+    },
+    {
+      "path": "../plugin-management"
     },
     {
       "path": "../terminal"

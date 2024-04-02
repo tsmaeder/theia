@@ -8,8 +8,10 @@
     "@theia/core": "1.59.0",
     "@theia/debug": "1.59.0",
     "@theia/filesystem": "1.59.0",
+    "@theia/installer": "1.49.0",
     "@theia/output": "1.59.0",
     "@theia/plugin-ext": "1.59.0",
+    "@theia/plugin-management": "1.49.0",
     "@theia/workspace": "1.59.0",
     "ps-tree": "^1.2.0",
     "tslib": "^2.6.2"
@@ -53,6 +55,5 @@
   },
   "nyc": {
     "extends": "../../configs/nyc.json"
-  },
-  "gitHead": "21358137e41342742707f660b8e222f940a27652"
+  }
 }

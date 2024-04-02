@@ -20,7 +20,6 @@ import * as markdownit from '@theia/core/shared/markdown-it';
 import * as DOMPurify from '@theia/core/shared/dompurify';
 import { Emitter, Event } from '@theia/core/lib/common/event';
 import { CancellationToken, CancellationTokenSource } from '@theia/core/lib/common/cancellation';
-import { HostedPluginSupport } from '@theia/plugin-ext/lib/hosted/browser/hosted-plugin';
 import { VSXExtension, VSXExtensionFactory } from './vsx-extension';
 import { ProgressService } from '@theia/core/lib/common/progress-service';
 import { VSXExtensionsSearchModel } from './vsx-extensions-search-model';
@@ -34,15 +33,20 @@ import { RequestContext, RequestService } from '@theia/core/shared/@theia/reques
 import { OVSXApiFilterProvider } from '@theia/ovsx-client';
 import { ApplicationServer } from '@theia/core/lib/common/application-protocol';
 import { FileService } from '@theia/filesystem/lib/browser/file-service';
+import { InstallerBackendService } from '@theia/plugin-management/lib/common/installer-backend-service';
+import { InstalledPluginWatcher } from '@theia/plugin-management/lib/browser/installed-plugin-watcher';
+import { PluginId } from '@theia/installer';
+import { HostedPluginSupport } from '@theia/plugin-ext/lib/hosted/browser/hosted-plugin';
 
 @injectable()
 export class VSXExtensionsModel {
-
     protected initialized: Promise<void>;
     /**
      * Single source for all extensions
      */
     protected readonly extensions = new Map<string, VSXExtension>();
+    protected readonly loadedPlugins = new Map<string, string>();
+
     protected readonly onDidChangeEmitter = new Emitter<void>();
     protected _installed = new Set<string>();
     protected _recommended = new Set<string>();
@@ -57,6 +61,12 @@ export class VSXExtensionsModel {
 
     @inject(OVSXClientProvider)
     protected clientProvider: OVSXClientProvider;
+
+    @inject(InstallerBackendService)
+    protected readonly installerService: InstallerBackendService;
+
+    @inject(InstalledPluginWatcher)
+    protected readonly pluginWatcher: InstalledPluginWatcher;
 
     @inject(HostedPluginSupport)
     protected readonly pluginSupport: HostedPluginSupport;
@@ -87,6 +97,7 @@ export class VSXExtensionsModel {
 
     @inject(ApplicationServer)
     protected readonly applicationServer: ApplicationServer;
+    _markedForUninstall: PluginId.VersionedId[];
 
     @postConstruct()
     protected init(): void {
@@ -130,6 +141,10 @@ export class VSXExtensionsModel {
 
     isInstalled(id: string): boolean {
         return this._installed.has(id);
+    }
+
+    isUninstalled(id: string): boolean {
+        return !!this._markedForUninstall.find(versionedId => PluginId.parse(versionedId).id === id);
     }
 
     getExtension(id: string): VSXExtension | undefined {
@@ -186,8 +201,7 @@ export class VSXExtensionsModel {
     }
 
     protected async initInstalled(): Promise<void> {
-        await this.pluginSupport.willStart;
-        this.pluginSupport.onDidChangePlugins(() => this.updateInstalled());
+        this.pluginWatcher.onDidChangeInstalledPlugins(() => this.updateInstalled());
         try {
             await this.updateInstalled();
         } catch (e) {
@@ -226,7 +240,7 @@ export class VSXExtensionsModel {
     protected setExtension(id: string): VSXExtension {
         let extension = this.extensions.get(id);
         if (!extension) {
-            extension = this.extensionFactory({ id });
+            extension = this.extensionFactory({ id, model: this });
             this.extensions.set(id, extension);
         }
         return extension;
@@ -327,28 +341,33 @@ export class VSXExtensionsModel {
         }
     }
 
+    isLoaded(pluginId: PluginId.UnversionedId): boolean {
+        return this.loadedPlugins.has(pluginId);
+    }
+
     protected async updateInstalled(): Promise<void> {
-        const prevInstalled = this._installed;
         return this.doChange(async () => {
-            const plugins = this.pluginSupport.plugins;
+            this.loadedPlugins.clear();
+            for (const versionedId of await this.pluginSupport.getLoadedPlugins()) {
+                const id = PluginId.parse(versionedId);
+                this.loadedPlugins.set(id.id, id.version!);
+            }
+            const plugins = await this.installerService.getInstalledPlugins();
+            this._markedForUninstall = await this.installerService.getUninstalledPlugins();
             const currInstalled = new Set<string>();
             const refreshing = [];
             for (const plugin of plugins) {
-                if (plugin.model.engine.type === 'vscode') {
-                    const version = plugin.model.version;
-                    const id = plugin.model.id;
-                    this._installed.delete(id);
-                    const extension = this.setExtension(id);
-                    currInstalled.add(extension.id);
-                    refreshing.push(this.refresh(id, version));
-                }
+                this._installed.delete(plugin.id.id);
+                const extension = this.setExtension(plugin.id.id);
+                currInstalled.add(extension.id);
+                refreshing.push(this.refresh(plugin.id.id, plugin.id.version));
             }
             for (const id of this._installed) {
                 const extension = this.getExtension(id);
                 if (!extension) { continue; }
                 refreshing.push(this.refresh(id, extension.version));
             }
-            const installed = new Set([...prevInstalled, ...currInstalled]);
+            const installed = new Set(currInstalled);
             const installedSorted = Array.from(installed).sort((a, b) => this.compareExtensions(a, b));
             this._installed = new Set(installedSorted.values());
             await Promise.all(refreshing);

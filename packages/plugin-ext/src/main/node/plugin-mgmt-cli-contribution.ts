@@ -18,7 +18,7 @@ import { inject, injectable } from '@theia/core/shared/inversify';
 import { Argv, Arguments } from '@theia/core/shared/yargs';
 import { CliContribution } from '@theia/core/lib/node/cli';
 import { HostedPluginDeployerHandler } from '../../hosted/node/hosted-plugin-deployer-handler';
-import { PluginType } from '../../common';
+import { DeploymentKind } from '@theia/installer';
 
 @injectable()
 export class PluginMgmtCliContribution implements CliContribution {
@@ -46,9 +46,9 @@ export class PluginMgmtCliContribution implements CliContribution {
             async yargs => {
                 const showVersions = yargs[PluginMgmtCliContribution.SHOW_VERSIONS];
                 const deployedIds = await this.deployerHandler.getDeployedBackendPlugins();
-                const pluginType = yargs[PluginMgmtCliContribution.SHOW_BUILTINS] ? PluginType.System : PluginType.User;
+                const pluginType = yargs[PluginMgmtCliContribution.SHOW_BUILTINS] ? DeploymentKind.BuiltIn : DeploymentKind.Installed;
                 process.stdout.write('installed plugins:\n');
-                deployedIds.filter(plugin => plugin.type === pluginType).forEach(plugin => {
+                deployedIds.filter(plugin => plugin.kind === pluginType).forEach(plugin => {
                     if (showVersions) {
                         process.stdout.write(`${plugin.metadata.model.id}@${plugin.metadata.model.version}\n`);
                     } else {

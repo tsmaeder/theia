@@ -14,13 +14,13 @@
 // SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-only WITH Classpath-exception-2.0
 // *****************************************************************************
 
-import { RequestContext, RequestService } from '@theia/core/shared/@theia/request';
+import { RequestService } from '@theia/core/shared/@theia/request';
 import { inject, injectable } from '@theia/core/shared/inversify';
 import { Deferred } from '@theia/core/lib/common/promise-util';
 import { promises as fs } from 'fs';
-import * as path from 'path';
-import { PluginDeployerResolver, PluginDeployerResolverContext } from '../../common';
 import { getTempDirPathAsync } from './temp-dir-util';
+import { DeployableFileArtifact, DownloadableFileArtifact } from '@theia/plugin-management/lib/node';
+import { ArtifactResolver } from '@theia/installer';
 
 /**
  * Resolver that handle the github: protocol
@@ -28,7 +28,7 @@ import { getTempDirPathAsync } from './temp-dir-util';
  * github:<org>/<repo>/<filename>@<version>
  */
 @injectable()
-export class GithubPluginDeployerResolver implements PluginDeployerResolver {
+export class GithubArtifactResolver implements ArtifactResolver {
 
     private static PREFIX = 'github:';
 
@@ -52,15 +52,22 @@ export class GithubPluginDeployerResolver implements PluginDeployerResolver {
     }
 
     /**
+  * Handle only the plugins that starts with github:
+  */
+    canHandle(uri: string): boolean {
+        return uri.startsWith(GithubArtifactResolver.PREFIX);
+    }
+
+    /**
      * Grab the remote file specified by Github URL
      */
-    async resolve(pluginResolverContext: PluginDeployerResolverContext): Promise<void> {
+    async resolve(uri: string): Promise<DeployableFileArtifact> {
 
         // download the file
         // extract data
-        const extracted = /^github:(.*)\/(.*)\/(.*)$/gm.exec(pluginResolverContext.getOriginId());
+        const extracted = /^github:(.*)\/(.*)\/(.*)$/gm.exec(uri);
         if (!extracted || extracted === null || extracted.length !== 4) {
-            throw new Error('Invalid extension' + pluginResolverContext.getOriginId());
+            throw new Error('Invalid extension' + uri);
         }
 
         const orgName = extracted[1];
@@ -78,11 +85,11 @@ export class GithubPluginDeployerResolver implements PluginDeployerResolver {
             filename = splitFile[0];
             version = splitFile[1];
         }
-        // latest version, need to get the redirect
-        const url = GithubPluginDeployerResolver.GITHUB_ENDPOINT + orgName + '/' + repoName + '/releases/latest';
 
         // if latest, resolve first the real version
         if (version === 'latest') {
+            // latest version, need to get the redirect
+            const url = GithubArtifactResolver.GITHUB_ENDPOINT + orgName + '/' + repoName + '/releases/latest';
             // disable redirect to grab the release
             const followRedirects = 0;
             const response = await this.request.request({ url, followRedirects });
@@ -100,40 +107,15 @@ export class GithubPluginDeployerResolver implements PluginDeployerResolver {
                 }
 
                 // grab version of tag
-                return this.grabGithubFile(pluginResolverContext, orgName, repoName, filename, taggedValueArray[1]);
+                const downloadUri = GithubArtifactResolver.GITHUB_ENDPOINT + orgName + '/' + repoName + '/releases/download/' + version + '/' + filename;
 
+                return new DownloadableFileArtifact(this.request, await this.unpackedFolder.promise, `${filename}-${version}`, { id: filename, version: taggedValueArray[1] }, downloadUri)
+            } else {
+                throw new Error(`Could not resolve latest version for ${url}`);
             }
         } else {
-            return this.grabGithubFile(pluginResolverContext, orgName, repoName, filename, version);
+            const downloadUri = GithubArtifactResolver.GITHUB_ENDPOINT + orgName + '/' + repoName + '/releases/download/' + version + '/' + filename;
+            return new DownloadableFileArtifact(this.request, await this.unpackedFolder.promise, `${filename}-${version}`, { id: filename, version: version }, downloadUri)
         }
-    }
-
-    /*
-     * Grab the github file specified by the plugin's ID
-     */
-    protected async grabGithubFile(pluginResolverContext: PluginDeployerResolverContext, orgName: string, repoName: string, filename: string, version: string): Promise<void> {
-        const unpackedFolder = await this.unpackedFolder.promise;
-        const unpackedPath = path.resolve(unpackedFolder, path.basename(version + filename));
-        try {
-            await fs.access(unpackedPath);
-            // use of cache. If file is already there use it directly
-            return;
-        } catch { }
-
-        const url = GithubPluginDeployerResolver.GITHUB_ENDPOINT + orgName + '/' + repoName + '/releases/download/' + version + '/' + filename;
-        const response = await this.request.request({ url });
-        if (RequestContext.isSuccess(response)) {
-            await fs.writeFile(unpackedPath, response.buffer);
-            pluginResolverContext.addPlugin(pluginResolverContext.getOriginId(), unpackedPath);
-        } else {
-            throw new Error(`Could not download the plugin from GitHub. URL: ${url}. HTTP status code: ${response.res.statusCode}`);
-        }
-    }
-
-    /**
-     * Handle only the plugins that starts with github:
-     */
-    accept(pluginId: string): boolean {
-        return pluginId.startsWith(GithubPluginDeployerResolver.PREFIX);
     }
 }

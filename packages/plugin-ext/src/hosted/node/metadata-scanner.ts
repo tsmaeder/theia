@@ -15,13 +15,15 @@
 // *****************************************************************************
 
 import { inject, injectable, multiInject } from '@theia/core/shared/inversify';
-import { PluginPackage, PluginScanner, PluginMetadata, PLUGIN_HOST_BACKEND, PluginIdentifiers } from '../../common/plugin-protocol';
-import { PluginUninstallationManager } from '../../main/node/plugin-uninstallation-manager';
+import { PluginPackage, PluginScanner, PluginMetadata, PLUGIN_HOST_BACKEND } from '../../common/plugin-protocol';
+import { InstallerService } from '@theia/plugin-management/lib/node';
+
 @injectable()
 export class MetadataScanner {
     private scanners: Map<string, PluginScanner> = new Map();
 
-    @inject(PluginUninstallationManager) protected readonly uninstallationManager: PluginUninstallationManager;
+    @inject(InstallerService)
+    protected readonly installerService: InstallerService;
 
     constructor(@multiInject(PluginScanner) scanners: PluginScanner[]) {
         scanners.forEach((scanner: PluginScanner) => {
@@ -35,7 +37,6 @@ export class MetadataScanner {
             host: PLUGIN_HOST_BACKEND,
             model: scanner.getModel(plugin),
             lifecycle: scanner.getLifecycle(plugin),
-            outOfSync: this.uninstallationManager.isUninstalled(PluginIdentifiers.componentsToVersionedId(plugin)),
         };
     }
 

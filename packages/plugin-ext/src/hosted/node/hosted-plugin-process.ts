@@ -21,11 +21,12 @@ import { createIpcEnv } from '@theia/core/lib/node/messaging/ipc-protocol';
 import { inject, injectable, named } from '@theia/core/shared/inversify';
 import * as cp from 'child_process';
 import { Duplex } from 'stream';
-import { DeployedPlugin, HostedPluginClient, PLUGIN_HOST_BACKEND, PluginHostEnvironmentVariable, PluginIdentifiers, ServerPluginRunner } from '../../common/plugin-protocol';
+import { DeployedPlugin, HostedPluginClient, PLUGIN_HOST_BACKEND, PluginHostEnvironmentVariable, ServerPluginRunner } from '../../common/plugin-protocol';
 import { HostedPluginCliContribution } from './hosted-plugin-cli-contribution';
 import { HostedPluginLocalizationService } from './hosted-plugin-localization-service';
 import { ProcessTerminateMessage, ProcessTerminatedMessage } from './hosted-plugin-protocol';
 import psTree = require('ps-tree');
+import { PluginId } from '@theia/installer';
 
 export interface IPCConnectionOptions {
     readonly serverName: string;
@@ -233,7 +234,7 @@ export class HostedPluginProcess implements ServerPluginRunner {
     /**
      * Provides additional plugin ids.
      */
-    public async getExtraDeployedPluginIds(): Promise<PluginIdentifiers.VersionedId[]> {
+    public async getExtraDeployedPluginIds(): Promise<PluginId.VersionedId[]> {
         return [];
     }
 

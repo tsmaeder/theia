@@ -1,5 +1,5 @@
 // *****************************************************************************
-// Copyright (C) 2020 TypeFox and others.
+// Copyright (C) 2024 STMicroelectronics and others.
 //
 // This program and the accompanying materials are made available under the
 // terms of the Eclipse Public License v. 2.0 which is available at
@@ -14,7 +14,6 @@
 // SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-only WITH Classpath-exception-2.0
 // *****************************************************************************
 
-import { VSCodeExtensionUri as VSXExtensionUri } from '@theia/plugin-ext-vscode/lib/common/plugin-vscode-uri';
-/** @deprecated since 1.25.0. Import `VSCodeExtensionUri from `plugin-ext-vscode` package instead. */
-export { VSXExtensionUri };
-
+export * from './installer-service';
+export * from './directory-deployment';
+export * from './downloadable-file-artifact';

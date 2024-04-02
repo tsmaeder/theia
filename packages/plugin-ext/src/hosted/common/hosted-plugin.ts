@@ -23,7 +23,7 @@
 
 import debounce = require('@theia/core/shared/lodash.debounce');
 import { injectable, inject, interfaces, named, postConstruct, unmanaged } from '@theia/core/shared/inversify';
-import { PluginMetadata, HostedPluginServer, DeployedPlugin, PluginServer, PluginIdentifiers } from '../../common/plugin-protocol';
+import { PluginMetadata, HostedPluginServer, DeployedPlugin, PluginServer } from '../../common/plugin-protocol';
 import { AbstractPluginManagerExt, ConfigStorage } from '../../common/plugin-api-rpc';
 import {
     Disposable, DisposableCollection, Emitter,
@@ -36,6 +36,8 @@ import { Deferred } from '@theia/core/lib/common/promise-util';
 import { EnvVariablesServer } from '@theia/core/lib/common/env-variables';
 import { environment } from '@theia/core/shared/@theia/application-package/lib/environment';
 import { Measurement, Stopwatch } from '@theia/core/lib/common';
+import { PluginId } from '@theia/installer';
+import { InstallerBackendService } from '@theia/plugin-management/lib/common/installer-backend-service';
 
 export type PluginHost = 'frontend' | string;
 
@@ -64,6 +66,9 @@ export abstract class AbstractHostedPluginSupport<PM extends AbstractPluginManag
     @named(MainPluginApiProvider)
     protected readonly mainPluginApiProviders: ContributionProvider<MainPluginApiProvider>;
 
+    @inject(InstallerBackendService)
+    protected readonly installerService: InstallerBackendService;
+
     @inject(PluginServer)
     protected readonly pluginServer: PluginServer;
 
@@ -80,7 +85,9 @@ export abstract class AbstractHostedPluginSupport<PM extends AbstractPluginManag
 
     protected readonly managers = new Map<string, PM>();
 
-    protected readonly contributions = new Map<PluginIdentifiers.UnversionedId, PluginContributions>();
+    protected readonly contributions = new Map<PluginId.UnversionedId, PluginContributions>();
+
+    protected readonly uninstalledPlugins = new Set<PluginId.UnversionedId>();
 
     protected readonly activationEvents = new Set<string>();
 
@@ -118,7 +125,7 @@ export abstract class AbstractHostedPluginSupport<PM extends AbstractPluginManag
         return plugins;
     }
 
-    getPlugin(id: PluginIdentifiers.UnversionedId): DeployedPlugin | undefined {
+    getPlugin(id: PluginId.UnversionedId): DeployedPlugin | undefined {
         const contributions = this.contributions.get(id);
         return contributions && contributions.plugin;
     }
@@ -207,33 +214,42 @@ export abstract class AbstractHostedPluginSupport<PM extends AbstractPluginManag
         const toUnload = new Set(this.contributions.keys());
         let didChangeInstallationStatus = false;
         try {
-            const newPluginIds: PluginIdentifiers.VersionedId[] = [];
-            const [deployedPluginIds, uninstalledPluginIds] = await Promise.all([this.server.getDeployedPluginIds(), this.server.getUninstalledPluginIds()]);
+            const newPluginIds: PluginId.VersionedId[] = [];
+            const [deployedPluginIds, uninstalledPluginIds] = await Promise.all([this.server.getDeployedPluginIds(), this.installerService.getUninstalledPlugins()]);
+
+            console.log(`syncing plugins: ${this.clientId}`);
+            deployedPluginIds.forEach(plugin => console.log(plugin));
             waitPluginsMeasurement.log('Waiting for backend deployment');
             syncPluginsMeasurement = this.measure('syncPlugins');
+
             for (const versionedId of deployedPluginIds) {
-                const unversionedId = PluginIdentifiers.unversionedFromVersioned(versionedId);
+                const unversionedId = PluginId.toUnversionedString(PluginId.parse(versionedId));
                 toUnload.delete(unversionedId);
                 if (!this.contributions.has(unversionedId)) {
                     newPluginIds.push(versionedId);
                 }
             }
             for (const pluginId of toUnload) {
+                console.log(`unloading ${pluginId}`);
                 this.contributions.get(pluginId)?.dispose();
             }
             for (const versionedId of uninstalledPluginIds) {
-                const plugin = this.getPlugin(PluginIdentifiers.unversionedFromVersioned(versionedId));
-                if (plugin && PluginIdentifiers.componentsToVersionedId(plugin.metadata.model) === versionedId && !plugin.metadata.outOfSync) {
-                    plugin.metadata.outOfSync = didChangeInstallationStatus = true;
-                }
-            }
-            for (const contribution of this.contributions.values()) {
-                if (contribution.plugin.metadata.outOfSync && !uninstalledPluginIds.includes(PluginIdentifiers.componentsToVersionedId(contribution.plugin.metadata.model))) {
-                    contribution.plugin.metadata.outOfSync = false;
+                const id = PluginId.toUnversionedString(PluginId.parse(versionedId));
+                const plugin = this.getPlugin(id);
+                if (plugin && !this.uninstalledPlugins.has(id)) {
                     didChangeInstallationStatus = true;
                 }
             }
+            for (const id of this.contributions.keys()) {
+                if (this.uninstalledPlugins.has(id) &&
+                    !uninstalledPluginIds.find(versionedId => PluginId.toUnversionedString(PluginId.parse(versionedId)) === id)) {
+                    didChangeInstallationStatus = true;
+                }
+            }
+            this.uninstalledPlugins.clear();
+            uninstalledPluginIds.forEach(id => this.uninstalledPlugins.add(id));
             if (newPluginIds.length) {
+
                 const deployedPlugins = await this.server.getDeployedPlugins({ pluginIds: newPluginIds });
 
                 const plugins: DeployedPlugin[] = [];
@@ -247,7 +263,7 @@ export abstract class AbstractHostedPluginSupport<PM extends AbstractPluginManag
                 }
 
                 for (const plugin of plugins) {
-                    const pluginId = PluginIdentifiers.componentsToUnversionedId(plugin.metadata.model);
+                    const pluginId = PluginId.toUnversionedString(PluginId.fromComponents(plugin.metadata.model));
                     const contributions = new PluginContributions(plugin);
                     this.contributions.set(pluginId, contributions);
                     contributions.push(Disposable.create(() => this.contributions.delete(pluginId)));
@@ -296,6 +312,7 @@ export abstract class AbstractHostedPluginSupport<PM extends AbstractPluginManag
             if (contributions.state === PluginContributions.State.INITIALIZING) {
                 contributions.state = PluginContributions.State.LOADING;
                 contributions.push(Disposable.create(() => console.log(`[${pluginId}]: Unloaded plugin.`)));
+                console.log(`handling contributions for ${contributions.plugin.metadata.model.id}`);
                 contributions.push(this.handleContributions(contributions.plugin));
                 contributions.state = PluginContributions.State.LOADED;
                 console.debug(`[${this.clientId}][${pluginId}]: Loaded contributions.`);
@@ -359,6 +376,7 @@ export abstract class AbstractHostedPluginSupport<PM extends AbstractPluginManag
             }
 
             const plugins = hostContributions.map(contributions => contributions.plugin.metadata);
+
             thenable.push((async () => {
                 try {
                     const activationEvents = [...this.activationEvents];
