@@ -469,7 +469,7 @@
   display: flex;
   flex-direction: row;
   column-gap: 0px;
-  align-items: centery;
+  align-items: center;
 }
 
 .p-TabBar-toolbar .item>div {
@@ -495,7 +495,6 @@
   line-height: calc(var(--theia-icon-size)+2px);
   height: calc(var(--theia-icon-size)+2px);
   background-repeat: no-repeat;
-  line-height: 18px;
 }
 
 .p-TabBar-toolbar .item > div.no-icon {
@@ -528,8 +527,9 @@
  * stuffed in the bottom-right corner.
  */
 .p-TabBar-toolbar .item.menu .chevron {
-  font-size: 8px;
-  vertical-align: bottom;
+    font-size: 12px;
+    width: 0.8em;
+    vertical-align: center;
 }
 
 #theia-main-content-panel

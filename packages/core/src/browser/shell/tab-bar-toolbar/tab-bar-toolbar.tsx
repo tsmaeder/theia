@@ -332,15 +332,13 @@ export class TabBarToolbar extends ReactWidget {
         }
 
         return <div key={item.id}
-            className={TabBarToolbar.Styles.TAB_BAR_TOOLBAR_ITEM + ' enabled menu'}
+            className={TabBarToolbar.Styles.TAB_BAR_TOOLBAR_ITEM + ' ' + ACTION_ITEM + ' enabled menu'}
         >
             <div className={codicon(icon, true)}
                 title={item.text}
                 onClick={e => this.executeCommand(e, item)}
             />
-            <div className={ACTION_ITEM} onClick={event => this.showPopupMenu(item.menuPath!, event, contextMatcher)}>
-                <div className={codicon('chevron-down') + ' chevron'} />
-            </div>
+            <div className={codicon('chevron-down') + ' chevron'} onClick={event => this.showPopupMenu(item.menuPath!, event, contextMatcher)} />
 
         </div >;
     }
