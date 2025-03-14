@@ -16,22 +16,23 @@
 
 import { RemoteCliContext, RemoteCliContribution } from '@theia/core/lib/node/remote/remote-cli-contribution';
 import { inject, injectable } from '@theia/core/shared/inversify';
-import { PluginDeployerHandler, PluginType } from '@theia/plugin-ext';
+import { DeploymentKind } from '@theia/installer';
+import { InstallerService } from '@theia/plugin-management/lib/node';
 
 @injectable()
 export class VsxRemoteCli implements RemoteCliContribution {
 
-    @inject(PluginDeployerHandler)
-    protected readonly pluginDeployerHandler: PluginDeployerHandler;
+    @inject(InstallerService)
+    protected readonly installerService: InstallerService;
 
     async enhanceArgs(context: RemoteCliContext): Promise<string[]> {
-        const deployedPlugins = await this.pluginDeployerHandler.getDeployedPlugins();
+        const deployedPlugins = await this.installerService.getInstalledPlugins();
         // Plugin IDs can be duplicated between frontend and backend plugins, so we create a set first
         const installPluginArgs = Array.from(
             new Set(
                 deployedPlugins
-                    .filter(plugin => plugin.type === PluginType.User)
-                    .map(p => `--install-plugin=${p.metadata.model.id}`)
+                    .filter(plugin => plugin.kind === DeploymentKind.BuiltIn)
+                    .map(p => `--install-plugin=${p.id}`)
             )
         );
         return installPluginArgs;

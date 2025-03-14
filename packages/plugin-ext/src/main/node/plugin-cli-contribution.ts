@@ -66,7 +66,6 @@ export class PluginCliContribution implements CliContribution {
         }
     }
 
-
     maxSessionLogsFolders(): number {
         return this._maxSessionLogsFolders;
     }

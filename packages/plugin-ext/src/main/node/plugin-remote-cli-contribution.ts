@@ -17,16 +17,16 @@
 import { MaybePromise } from '@theia/core';
 import { RemoteCliContext, RemoteCliContribution } from '@theia/core/lib/node/remote/remote-cli-contribution';
 import { inject, injectable } from '@theia/core/shared/inversify';
-import { PluginCliContribution } from './plugin-cli-contribution';
+import { InstallerService } from '@theia/plugin-management/lib/node';
 
 @injectable()
 export class PluginRemoteCliContribution implements RemoteCliContribution {
 
-    @inject(PluginCliContribution)
-    protected readonly pluginCliContribution: PluginCliContribution;
+    @inject(InstallerService)
+    protected readonly installerService: InstallerService;
 
     enhanceArgs(context: RemoteCliContext): MaybePromise<string[]> {
-        const pluginsFolder = this.pluginCliContribution.localDir();
+        const pluginsFolder = this.installerService.builtInLocations[0];
         const defaultPlugins = process.env.THEIA_DEFAULT_PLUGINS;
         if (pluginsFolder || defaultPlugins) {
             return ['--plugins=local-dir:./plugins'];

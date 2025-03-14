@@ -16,23 +16,22 @@
 
 import { RemoteCopyContribution, RemoteCopyRegistry } from '@theia/core/lib/node/remote/remote-copy-contribution';
 import { inject, injectable } from '@theia/core/shared/inversify';
-import { PluginCliContribution } from './plugin-cli-contribution';
 import { FileUri } from '@theia/core/lib/common/file-uri';
+import { DirectoryDeploymentLocation, InstallerService } from '@theia/plugin-management/lib/node';
 
 @injectable()
 export class PluginRemoteCopyContribution implements RemoteCopyContribution {
 
-    @inject(PluginCliContribution)
-    protected readonly pluginCliContribution: PluginCliContribution;
+    @inject(InstallerService)
+    protected readonly installerService: InstallerService;
 
     async copy(registry: RemoteCopyRegistry): Promise<void> {
-        const localDir = this.pluginCliContribution.localDir();
-        const defaultPlugins = process.env.THEIA_DEFAULT_PLUGINS?.split(',') ?? [];
+        const locations = this.installerService.builtInLocations;
 
-        await Promise.all([localDir, ...defaultPlugins]
-            .filter(pluginDir => pluginDir && pluginDir.startsWith('local-dir:'))
-            .map(async (pluginDir: string) => {
-                const fsPath = FileUri.fsPath(pluginDir);
+        await Promise.all(locations
+            .filter(pluginDir => (pluginDir instanceof DirectoryDeploymentLocation))
+            .map(async (pluginDir: DirectoryDeploymentLocation) => {
+                const fsPath = FileUri.fsPath(pluginDir.rootPath);
                 await registry.directory(fsPath, 'plugins');
             }));
     }

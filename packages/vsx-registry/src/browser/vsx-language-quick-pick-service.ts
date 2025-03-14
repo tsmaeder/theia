@@ -76,7 +76,8 @@ export class VSXLanguageQuickPickService extends LanguageQuickPickService {
                                 } finally {
                                     progress.cancel();
                                 }
-                            });
+                            }
+                        });
                     }
                 }
             }
